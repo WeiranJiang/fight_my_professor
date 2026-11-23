@@ -1,6 +1,4 @@
-import { randomInt } from 'node:crypto';
 import { average, hp, level, botGuess, resolveRound } from '../../game.mjs';
-import { get, list, put, saveUser } from '../storage.mjs';
 import { owned, requireRule, timestamp, uid } from '../request.mjs';
 import { profiles } from '../profiles.mjs';
 import { achievementNames } from '../progression.mjs';
@@ -10,7 +8,8 @@ function exposedBattle(b, now) {
   const q = questions[b.round];
   return {...visible,reward,total:questions.length,remaining:b.status==='question'?Math.max(0,b.deadline-now):0,question:b.status==='question'?{prompt:q.prompt,unit:q.unit,category:q.category,time:q.time}:null};
 }
-function finish(b,u) {
+function finish(b,u,storage) {
+  const {saveUser}=storage;
   b.status='finished';
   const diff=b.playerHP/b.maxPlayer-b.enemyHP/b.maxEnemy;
   b.winner=Math.abs(diff)<1e-8?'tie':diff>0?'player':'enemy';
@@ -31,20 +30,21 @@ function finish(b,u) {
   b.reward={xp,level:level(u.xp,b.config),leveled:level(u.xp,b.config)>previous,achievements:achievementNames(u).filter(a=>!before.includes(a))};
   saveUser(u);
 }
-function createBattle(body,u,guest,c) {
-  const {people}=profiles(c);
+async function createBattle(body,u,guest,c,storage) {
+  const {get,list,put}=storage;
+  const {people}=(await profiles(c, storage));
   const playerMode=body.mode==='player';
   if(playerMode) { owned(u); requireRule(u.avatar,'Save your fighter first.'); }
   const from=playerMode?{id:u.id,name:u.name,avatar:u.avatar,values:u.values,power:Math.round(average(u.values)),level:level(u.xp,c)}:people.find(p=>p.id===body.from);
   const to=people.find(p=>p.id===body.to);
   requireRule(from&&to&&from.id!==to.id,'Choose two distinct fighters.');
-  const bank=list('question').filter(q=>q.active);
+  const bank=(await list('question')).filter(q=>q.active);
   requireRule(bank.length>=7,'The arena needs at least seven active questions.',503);
-  const recent=get('recent',u?.id??guest)??[];
+  const recent=(await get('recent',u?.id??guest))??[];
   const shuffled = [...bank];
-  for(let i=shuffled.length-1;i>0;i--){const j=randomInt(i+1);[shuffled[i],shuffled[j]]=[shuffled[j],shuffled[i]];}
+  for(let i=shuffled.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[shuffled[i],shuffled[j]]=[shuffled[j],shuffled[i]];}
   shuffled.sort((a,b)=>Number(recent.includes(a.id))-Number(recent.includes(b.id)));
-  const questions=shuffled.slice(0,7).map(q=>({...q,bot:botGuess(q,to,()=>randomInt(100000)/100000,c)}));
+  const questions=shuffled.slice(0,7).map(q=>({...q,bot:botGuess(q,to,Math.random,c)}));
   put('recent',u?.id??guest,[...questions.map(q=>q.id),...recent].slice(0,14));
   const fighter = ({id,name,avatar,values,power,level,difficulty,school,demo})=>({id,name,avatar,values,power,level,difficulty,school,demo});
   const maxPlayer=hp(from,c),maxEnemy=hp(to,c);
@@ -53,12 +53,13 @@ function createBattle(body,u,guest,c) {
   return b;
 }
 
-function battleStart({body, u, guest, c}) {
-  return exposedBattle(createBattle(body,u,guest,c),Date.now());
+async function battleStart({body, u, guest, c, storage}) {
+  return exposedBattle(await createBattle(body,u,guest,c,storage),Date.now());
 }
 
-function battle({method, params, body, u, guest}) {
-  const b=get('battle',method==='GET'?params.get('id'):body.id);
+async function battle({method, params, body, u, guest, storage}) {
+  const {get, put}=storage;
+  const b=await get('battle',method==='GET'?params.get('id'):body.id);
   requireRule(b,'Battle not found.',404);
   const owner=b.owner?u?.id===b.owner:guest===b.guest;
   if(method==='GET'){
@@ -71,13 +72,13 @@ function battle({method, params, body, u, guest}) {
     b.round++; b.status='question'; b.deadline=Date.now()+b.questions[b.round].time*1000;
   } else if(body.action==='guess'&&b.status==='question'){
     const q=b.questions[b.round], expired=Date.now()>=b.deadline;
-    if (expired) body.estimate=null;
-    requireRule(expired||(typeof body.estimate==='number'&&Number.isFinite(body.estimate)&&body.estimate>=0&&body.estimate<=1e12&&(q.unit!=='%'||body.estimate<=100)),'Enter a valid numeric estimate.');
-    const round=resolveRound(q,body.estimate,q.bot,b.player,b.enemy,b.config,b.round+1);
+    const estimate=expired?null:body.estimate;
+    requireRule(expired||(typeof estimate==='number'&&Number.isFinite(estimate)&&estimate>=0&&estimate<=1e12&&(q.unit!=='%'||estimate<=100)),'Enter a valid numeric estimate.');
+    const round=resolveRound(q,estimate,q.bot,b.player,b.enemy,b.config,b.round+1);
     b.log.push({...round,prompt:q.prompt,unit:q.unit});
     if(round.winner==='player') b.enemyHP=Math.max(0,b.enemyHP-round.damage);
     if(round.winner==='enemy') b.playerHP=Math.max(0,b.playerHP-round.damage);
-    if(!b.enemyHP||!b.playerHP||b.round===b.questions.length-1) finish(b,u);
+    if(!b.enemyHP||!b.playerHP||b.round===b.questions.length-1) finish(b,u,storage);
     else b.status='reveal';
   }
   put('battle',b.id,b);

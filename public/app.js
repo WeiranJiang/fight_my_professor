@@ -69,7 +69,7 @@ function home(){
   form.onsubmit=e=>{e.preventDefault();go('search?q='+qs(input.value.trim()));};
   input.oninput=()=>{
     const query=input.value.toLowerCase().trim();
-    const entries=[...state.people.filter(p=>p.name.toLowerCase().includes(query)).map(p=>[p.name,p.demo?'Demo professor':p.department,linkProf(p.id)]),...state.schools.filter(s=>(s.name+' '+s.short).toLowerCase().includes(query)).map(s=>[s.name,'University',linkSchool(s.id)])];
+    const entries=[...state.schools.filter(s=>normalizeSearch(s.name+' '+s.short).includes(normalizeSearch(query))).map(s=>[s.name,'University',linkSchool(s.id)]),...state.people.filter(p=>normalizeSearch(p.name).includes(normalizeSearch(query))).map(p=>[p.name,p.demo?'Demo professor':p.department,linkProf(p.id)])];
     suggestions.innerHTML=query?entries.slice(0,6).map(([name,type,link])=>'<a href="#'+link+'"><strong>'+esc(name)+'</strong><small>'+esc(type)+'</small></a>').join(''):'';
   };
   form.addEventListener('focusout',event=>{if(!form.contains(event.relatedTarget))suggestions.replaceChildren();});
@@ -77,18 +77,35 @@ function home(){
   input.addEventListener('keydown',event=>{if(event.key==='Escape')suggestions.replaceChildren();if(event.key==='ArrowDown'&&$('a',suggestions)){event.preventDefault();$('a',suggestions).focus();}});
 }
 const schoolOptions=(selected='',allLabel='All schools')=>'<option value="">'+allLabel+'</option>'+state.schools.map(s=>'<option value="'+esc(s.id)+'" '+pick(s.id,selected)+'>'+esc(s.name)+'</option>').join('');
+const directoryOrder=new Intl.Collator('en',{sensitivity:'base'});
+const normalizeSearch=value=>value.normalize('NFKD').replace(/\p{M}/gu,'').toLowerCase().trim();
+const matchesProfessor=(p,query)=>normalizeSearch([p.name,p.department,p.academicTitle,school(p.school)?.name,school(p.school)?.short,...(p.research??[])].filter(Boolean).join(' ')).includes(query);
+function directoryRow(p){
+  const label=p.demo?'Demo fighter':p.count?p.power+' game power':'Unrated';
+  const details=[p.department,school(p.school)?.short].filter(Boolean).join(' · ');
+  return '<a class="directory-row" href="#'+linkProf(p.id)+'"><span class="directory-avatar tone-'+esc(p.tone)+'">'+sprite(p.avatar)+'</span><span class="directory-person"><strong>'+esc(p.name)+'</strong><small>'+esc(details)+'</small>'+(p.research?.length?'<small class="directory-topics">'+esc(p.research.slice(0,3).join(' · '))+'</small>':'')+'</span><span class="directory-rating">'+esc(label)+'</span></a>';
+}
 function search(){
-  const q=params().get('q')??'';
-  page(head('Faculty directory','Find a Professor','Explore fictional combat stats, student ratings, and trivia opponents.')+
-    '<div class="filters"><input id="query" aria-label="Search directory" placeholder="Professor, department or university" value="'+esc(q)+'"><select id="school-filter" aria-label="Filter by school">'+schoolOptions(params().get('school')??'')+'</select>'+button('Request a professor','request?kind=professor','subtle')+'</div><div id="search-results"></div>');
+  const query=params().get('q')??'', campus=params().get('school')??'';
+  page(head('','Faculty Directory','Search by professor, university, department, or research topic.')+
+    '<div class="filters directory-filters"><input id="query" type="search" aria-label="Search faculty directory" placeholder="Name, school, or research topic" value="'+esc(query)+'"><select id="school-filter" aria-label="Filter by school">'+schoolOptions(campus)+'</select></div><div id="search-results"></div><p class="directory-footer">'+button('Request a professor','request?kind=professor'+(campus?'&school='+qs(campus):''),'subtle')+'</p>');
   const input=$('#query'),select=$('#school-filter'),results=$('#search-results');
-  const render=()=>{
-    const query=input.value.trim().toLowerCase(), campus=select.value;
-    const people=state.people.filter(p=>(!campus||p.school===campus)&&[p.name,p.department,school(p.school)?.name,school(p.school)?.short].filter(Boolean).join(' ').toLowerCase().includes(query));
-    const schools=query&&!campus?state.schools.filter(s=>(s.name+' '+s.short).toLowerCase().includes(query)):[];
-    results.innerHTML='<p class="muted">'+people.length+' professor'+(people.length===1?'':'s')+'</p>'+(people.length?'<div class="grid three">'+people.map(p=>card(p,'View profile')).join('')+'</div>':empty('No professors match this search.'))+(schools.length?'<div class="section"><h2>Matching schools</h2><br><div class="grid three school-grid">'+schools.map(schoolCard).join('')+'</div></div>':'');
+  const pageSize=24;
+  let shown=pageSize;
+  const render=(focusNew=false)=>{
+    const query=normalizeSearch(input.value), campus=select.value;
+    const people=state.people.filter(p=>(!p.demo||Boolean(query))&&(!campus||p.school===campus)&&matchesProfessor(p,query))
+      .sort((a,b)=>Number(a.demo)-Number(b.demo)||directoryOrder.compare(a.name,b.name));
+    const matchingSchools=query&&!campus?state.schools.filter(s=>normalizeSearch(s.name+' '+s.short).includes(query)):[];
+    results.innerHTML=(matchingSchools.length?'<div class="directory-schools">'+matchingSchools.map(s=>button(esc(s.name),linkSchool(s.id),'subtle')).join('')+'</div>':'')+
+      '<p class="directory-count small">'+people.length.toLocaleString()+' '+(people.length===1?'profile':'profiles')+'</p>'+
+      (people.length?'<div class="directory-list">'+people.slice(0,shown).map(directoryRow).join('')+'</div>':empty('No professors match this search.'))+
+      (people.length>shown?'<div class="directory-footer"><button class="btn subtle" id="more-faculty">Show more professors</button></div>':'');
+    if(focusNew) all('.directory-row',results)[shown-pageSize]?.focus();
+    if($('#more-faculty'))$('#more-faculty').onclick=()=>{shown+=pageSize;render(true);};
   };
-  input.oninput=render;select.onchange=render;render();
+  input.oninput=select.onchange=()=>{shown=pageSize;render();};
+  render();
 }
 function schools(){
   page(head('University directory','Schools','Browse the launch campuses and see who’s in their arena.')+'<div class="filters"><input id="school-query" aria-label="Search schools" placeholder="Search schools">'+button('Request a school','request?kind=school','subtle')+'</div><div id="schools" class="grid three school-grid"></div>');
@@ -98,8 +115,8 @@ function schools(){
 }
 function schoolPage(){
   const s=school(params().get('id'));if(!s)throw new Error('School not found.');
-  const people=state.people.filter(p=>p.school===s.id);
-  page(head('Campus directory',esc(s.name),esc(s.location))+'<div class="actions"><a class="btn subtle" href="'+esc(s.url)+'" target="_blank" rel="noopener">University website</a>'+button('Campus rankings','rankings?school='+qs(s.id),'subtle')+button('Request a professor','request?kind=professor&school='+qs(s.id),'primary')+'</div><div class="section"><h2>Professors</h2><br>'+(people.length?'<div class="grid three">'+people.map(p=>card(p)).join('')+'</div>':empty('This school is waiting for its first approved faculty profile.'))+'</div>');
+  const people=state.people.filter(p=>p.school===s.id&&!p.demo).sort((a,b)=>directoryOrder.compare(a.name,b.name));
+  page(head('',esc(s.name),esc(s.location))+'<div class="actions">'+button('Browse '+people.length+' faculty profiles','search?school='+qs(s.id),'primary')+'<a class="btn subtle" href="'+esc(s.url)+'" target="_blank" rel="noopener">University website</a>'+button('Campus rankings','rankings?school='+qs(s.id),'subtle')+'</div><div class="section"><h2>Faculty</h2><br>'+(people.length?'<div class="directory-list">'+people.slice(0,12).map(directoryRow).join('')+'</div>':empty('This school is waiting for its first faculty profile.'))+'</div>');
 }
 function modal(title,content){
   activeDialog?.close();
@@ -153,16 +170,16 @@ async function professor(id,version){
   const {p,reviews,fought}=await api('professor?id='+qs(id));
   if(version!==routeCounter)return;
   const mine=reviews.find(r=>r.mine);
-  page('<div class="profile-head">'+score(p.power,'OVERALL POWER')+'<div><span class="eyebrow">'+(p.demo?'Fictional demo professor':'Professor profile')+'</span><h1>'+esc(p.name)+'</h1><p class="muted">'+esc(p.department)+' · <a class="text-link" href="#'+linkSchool(p.school)+'">'+schoolName(p.school)+'</a></p><span class="pill">'+p.difficulty+'</span> <small>'+p.count+' ratings'+(p.rank?' · #'+p.schoolRank+' at '+esc(school(p.school)?.short)+' · #'+p.rank+' globally':'')+'</small></div><div class="card-stage tone-'+esc(p.tone)+'">'+sprite(p.avatar)+'</div></div>'+
+  page('<div class="profile-head">'+score(p.demo||p.count?p.power:'—',p.demo||p.count?'GAME POWER':'UNRATED')+'<div><span class="eyebrow">'+(p.demo?'Fictional demo professor':'Professor profile')+'</span><h1>'+esc(p.name)+'</h1><p class="muted">'+esc(p.department)+' · <a class="text-link" href="#'+linkSchool(p.school)+'">'+schoolName(p.school)+'</a></p>'+(p.academicTitle?'<p class="faculty-title">'+esc(p.academicTitle)+'</p>':'')+'<span class="pill">'+p.difficulty+'</span> <small>'+p.count+' ratings'+(p.rank?' · #'+p.schoolRank+' at '+esc(school(p.school)?.short)+' · #'+p.rank+' globally':'')+'</small></div><div class="card-stage tone-'+esc(p.tone)+'">'+sprite(p.avatar)+'</div></div>'+
     '<div class="actions">'+button(bolt+' Challenge professor','fight?to='+qs(p.id),'primary raised')+'<button class="btn" id="rate">'+(mine?'Edit your rating':'Rate professor')+'</button><button class="btn subtle" id="compare">Compare</button><button class="btn subtle" id="favorite">'+(state.me?.favorites.includes(p.id)?'★ Saved':'☆ Save')+'</button></div>'+
-    '<div class="section grid two"><div class="panel stack"><h2>Combat stats</h2>'+bars(p)+'<small>Bayesian average weighted with '+state.settings.priorWeight+' prior ratings at '+(p.demo?'each demo base stat':state.settings.prior+'/100')+'. Official ranks require '+state.settings.minRatings+' ratings and a verified faculty profile.</small></div><div class="panel stack"><h2>About this fighter</h2><p>'+esc(p.title)+' · '+fought+' completed '+(fought===1?'battle':'battles')+'</p><small>'+(p.demo?'This is a fictional training character. The university label identifies the demo arena.':'This avatar and combat profile are community-created game elements.')+'</small><div class="actions"><button class="btn subtle" id="avatar-edit">Suggest avatar edit</button><button class="btn subtle" id="correction">Request correction or removal</button></div>'+(p.source?'<a class="text-link small" href="'+esc(p.source)+'" target="_blank" rel="noopener">Official faculty source</a>':'')+'</div></div>'+
+    '<div class="section grid two"><div class="panel stack"><h2>Game stats</h2>'+bars(p)+'<small>'+(p.demo?'Demo battle stats.':p.count?'Community game ratings use a baseline and require '+state.settings.minRatings+' reviews for official ranks.':'This fighter uses neutral starting stats until the community adds ratings.')+'</small></div><div class="panel stack"><h2>'+(p.demo?'Training fighter':'Academic profile')+'</h2>'+(p.demo?'<p>'+esc(p.title)+' · '+fought+' completed '+(fought===1?'battle':'battles')+'</p>':(p.research?.length?'<div><h3>Research areas</h3><ul class="research-list">'+p.research.map(topic=>'<li>'+esc(topic)+'</li>').join('')+'</ul></div>':'<p>'+esc(p.department)+'</p>'))+(p.source?'<a class="text-link small" href="'+esc(p.source)+'" target="_blank" rel="noopener">Official faculty source</a>':'')+'<details><summary>Profile feedback</summary><div class="actions directory-footer"><button class="btn subtle" id="avatar-edit">Suggest avatar edit</button><button class="btn subtle" id="correction">Request correction or removal</button></div></details></div></div>'+
     '<div class="panel"><h2>Student reviews</h2>'+(reviews.map(r=>'<article class="review"><div class="split"><strong>'+((r.values.reduce((x,y)=>x+y,0)/6).toFixed(1))+' / 5</strong><small>'+date(r.date)+(r.course?' · '+esc(r.course):'')+'</small></div><small>'+stats.map((s,i)=>s+' '+r.values[i]).join(' · ')+'</small><p>'+esc(r.comment)+'</p><div class="actions">'+r.tags.map(t=>'<span class="pill">'+esc(t)+'</span>').join('')+'</div><div class="actions">'+(r.mine?'<button class="btn subtle danger" id="remove-review">Delete your rating</button>':'<button class="btn subtle" data-help="'+esc(r.id)+'" aria-pressed="'+r.voted+'">Helpful ('+r.helpful+')</button><button class="btn subtle" data-report="'+esc(r.id)+'">Report</button>')+'</div></article>').join('')||empty('No student ratings yet.'))+'</div>');
   $('#rate').onclick=()=>state.me?rating(p,mine):noAuth();
   $('#favorite').onclick=async()=>{if(!state.me){noAuth();return;}try{await api('favorite',{id:p.id});await refresh();route(false);}catch(e){showToast(e.message);}};
   $('#avatar-edit').onclick=()=>state.me?avatarEditor(p):noAuth();
   $('#correction').onclick=()=>report('correction',p.id,'Request a correction or removal');
   $('#compare').onclick=()=>compare(p);
-  all('[data-help]').forEach(el=>el.onclick=async()=>{el.disabled=true;try{await api('helpful',{id:el.dataset.help});route(false);}catch(e){showToast(e.message);el.disabled=false;}});
+  all('[data-help]').forEach(el=>el.onclick=async()=>{if(!state.me){noAuth();return;}el.disabled=true;try{await api('helpful',{id:el.dataset.help});route(false);}catch(e){showToast(e.message);el.disabled=false;}});
   all('[data-report]').forEach(el=>el.onclick=()=>report('report',el.dataset.report,'Report this review'));
   if($('#remove-review'))$('#remove-review').onclick=()=>{
     const dialog=modal('Delete your rating?','<p>This removes your rating and written review.</p><button class="btn danger" id="confirm-delete">Delete rating</button>');
@@ -295,9 +312,9 @@ function arena(){
   page(head('Campus arena','Pick your matchup','Both fighters estimate the same number. The closest guess lands the hit.')+'<div id="setup"></div>');
   const setup=$('#setup');
   function picker(label,id,selected){
-    return '<div class="stack"><label class="field">'+label+'<input id="'+id+'-find" placeholder="Find by name or school" autocomplete="off"></label><label class="field"><span class="small">Select professor</span><select id="'+id+'-select">'+pickerOptions(latest,selected)+'</select></label></div>';
+    return '<div class="stack"><label class="field">'+label+'<input id="'+id+'-find" placeholder="Find by name or school" autocomplete="off"></label><label class="field"><span class="small">Select professor</span><select id="'+id+'-select">'+pickerOptions([prof(selected),...latest.filter(p=>p.id!==selected).slice(0,39)].filter(Boolean),selected)+'</select></label></div>';
   }
-  const pickerOptions=(people,selected)=>people.map(p=>'<option value="'+esc(p.id)+'" '+pick(p.id,selected)+'>'+esc(p.name)+(p.demo?' (demo)':'')+'</option>').join('');
+  const pickerOptions=(people,selected)=>people.map(p=>'<option value="'+esc(p.id)+'" '+pick(p.id,selected)+'>'+esc(p.name)+(p.demo?' (demo)':' · '+esc(school(p.school)?.short??''))+'</option>').join('');
   const preview=(p,player=false)=>p?'<div class="card-stage tone-'+esc(p.tone??'violet')+'">'+sprite(p.avatar)+'</div><h3>'+esc(p.name)+'</h3><p class="small">'+(player?'Level '+p.level:schoolName(p.school)+' · '+p.power+' power · '+p.difficulty)+'</p>'+bars(p):empty('No matching fighter.');
   function draw(){
     const playerReady=mode==='player'&&state.me?.avatar;
@@ -315,7 +332,7 @@ function arena(){
       };
       input.oninput=()=>{
         const search=input.value.toLowerCase().trim(), selected=key==='from'?from:to;
-        const matching=latest.filter(p=>[p.name,p.department,school(p.school)?.name,school(p.school)?.short].filter(Boolean).join(' ').toLowerCase().includes(search));
+        const matching=latest.filter(p=>matchesProfessor(p,normalizeSearch(search))).slice(0,60);
         select.innerHTML=matching.length?pickerOptions(matching,selected):'<option value="">No results</option>';
         select.onchange();
       };
@@ -382,14 +399,14 @@ async function admin(version){
   if(!state.me?.admin)throw new Error('Admin access required.');
   const data=await api('admin');if(version!==routeCounter)return;
   let tab=params().get('tab')??'Overview';
-  const kinds={'University Requests':['school'],'Professor Requests':['professor'],'Avatar Edits':['avatar'],'Reports':['report','correction','question']};
+  const kinds={'University Requests':['school'],'Professor Requests':['professor'],'Avatar Edits':['avatar'],'Trivia Submissions':['proposal'],'Reports':['report','correction','question']};
   const tabs=['Overview',...Object.keys(kinds),'Questions','Game Balance','Users'];
   const requests=data.requests.filter(r=>kinds[tab]?.includes(r.kind));
   const actionForm=r=>'<form data-request="'+esc(r.id)+'" class="stack"><div class="actions">'+(r.url?'<label><input name="verified" type="checkbox"> Official source verified</label>':'')+(r.kind==='correction'?'<label><input name="remove" type="checkbox"> Remove profile</label>':'')+'</div>'+field('Decision note (optional)','note','maxlength="600"')+'<div class="actions"><button class="btn primary" name="action" value="approve">Approve</button><button class="btn subtle" name="action" value="hold">Hold</button><button class="btn subtle danger" name="action" value="reject">Reject</button></div>'+err+'</form>';
-  const requestRows=()=>requests.map(r=>'<article class="admin-row stack"><div class="split"><strong>'+esc(r.name??prof(r.target)?.name??r.target??r.kind)+'</strong><span class="pill">'+esc(r.status)+'</span></div><small>'+[r.department,school(r.school)?.name,r.location,r.reply,date(r.date)].filter(Boolean).map(esc).join(' · ')+'</small>'+(r.url?'<a class="text-link" href="'+esc(r.url)+'" target="_blank" rel="noopener">Review submitted source</a>':'')+(r.avatar?'<div class="grid two"><div><small>Current</small><div class="preview">'+(prof(r.target)?sprite(prof(r.target).avatar):'Unavailable')+'</div></div><div><small>Proposed</small><div class="preview">'+sprite(r.avatar)+'</div></div></div>':'')+(r.note?'<p>'+esc(r.note)+'</p>':'')+(['pending','hold'].includes(r.status)?actionForm(r):r.decisionNote?'<small>'+esc(r.decisionNote)+'</small>':'')+'</article>').join('')||empty('No requests in this queue.');
+  const requestRows=()=>requests.map(r=>'<article class="admin-row stack"><div class="split"><strong>'+esc(r.question?.prompt??r.name??prof(r.target)?.name??r.target??r.kind)+'</strong><span class="pill">'+esc(r.status)+'</span></div><small>'+[r.department,school(r.school)?.name,r.location,r.reply,date(r.date)].filter(Boolean).map(esc).join(' · ')+'</small>'+(r.question?'<p class="small">'+esc(r.question.category)+' · Answer '+fmt(r.question.answer)+' '+esc(r.question.unit)+(r.question.source?' · <a class="text-link" href="'+esc(r.question.source)+'" target="_blank" rel="noopener">Check answer source</a>':'')+'</p>':'')+(r.url?'<a class="text-link" href="'+esc(r.url)+'" target="_blank" rel="noopener">Review submitted source</a>':'')+(r.avatar?'<div class="grid two"><div><small>Current</small><div class="preview">'+(prof(r.target)?sprite(prof(r.target).avatar):'Unavailable')+'</div></div><div><small>Proposed</small><div class="preview">'+sprite(r.avatar)+'</div></div></div>':'')+(r.note?'<p>'+esc(r.note)+'</p>':'')+(['pending','hold'].includes(r.status)?actionForm(r):r.decisionNote?'<small>'+esc(r.decisionNote)+'</small>':'')+'</article>').join('')||empty('No requests in this queue.');
   let content;
   if(tab in kinds)content='<div class="panel">'+requestRows()+'</div>';
-  else if(tab==='Questions')content='<div class="panel stack"><div class="actions"><button class="btn primary" id="add-question">Add question</button><button class="btn subtle" id="import-questions">Import JSON pack</button></div>'+data.questions.map(q=>'<div class="admin-row split"><div><strong>'+esc(q.prompt)+'</strong><br><small>'+esc(q.category)+' · '+fmt(q.answer)+' '+esc(q.unit)+' · '+(q.active?'Active':'Disabled')+'</small></div><button class="btn subtle" data-question="'+esc(q.id)+'">Edit</button></div>').join('')+'</div>';
+  else if(tab==='Questions')content='<div class="panel stack"><div class="actions"><button class="btn primary" id="add-question">Add question</button><button class="btn subtle" id="import-questions">Import JSON pack</button></div><div class="filters"><input id="question-search" type="search" placeholder="Search questions" aria-label="Search questions"><select id="question-status" aria-label="Filter question status"><option value="">All statuses</option><option value="active">Active</option><option value="disabled">Disabled</option></select></div><div id="question-list"></div></div>';
   else if(tab==='Game Balance')content='<form id="settings" class="panel stack">'+Object.entries(data.config).map(([key,n])=>field(settingsLabels[key],key,'required type="number" step="'+(key==='botSpread'?'0.1':'1')+'" value="'+n+'"')).join('')+err+'<div><button class="btn primary">Save settings</button></div></form>';
   else if(tab==='Users')content='<div class="panel">'+data.users.map(u=>'<div class="admin-row"><strong>'+esc(u.name)+'</strong> · '+esc(u.email)+' · '+u.xp+' XP'+(u.admin?' · Admin':'')+'</div>').join('')+'</div>';
   else content='<div class="grid two"><div class="panel stack"><h2>Review queues</h2>'+Object.entries(kinds).map(([label,types])=>'<a class="text-link" href="#admin?tab='+qs(label)+'">'+label+' ('+data.requests.filter(r=>types.includes(r.kind)&&['pending','hold'].includes(r.status)).length+')</a>').join('')+'</div><div class="panel stack"><h2>Audit log</h2>'+(data.audit.map(row=>'<small>'+date(row.date)+' · '+esc(row.admin)+' · '+esc(row.action)+'</small>').join('')||'<small>No actions recorded.</small>')+'</div></div>';
@@ -404,16 +421,53 @@ async function admin(version){
     await api('admin',{action:'settings',settings:Object.fromEntries([...fields].map(([key,n])=>[key,Number(n)]))});
     await refresh();route(false);showToast('Balancing settings saved.');
   });
-  if($('#add-question'))$('#add-question').onclick=()=>editQuestion();
-  all('[data-question]').forEach(el=>el.onclick=()=>editQuestion(data.questions.find(q=>q.id===el.dataset.question)));
+  if($('#add-question')){
+    $('#add-question').onclick=()=>editQuestion();
+    const search=$('#question-search'), status=$('#question-status'), list=$('#question-list');
+    const renderQuestions=()=>{
+      const query=search.value.trim().toLowerCase();
+      const filtered=data.questions.filter(q=>(q.prompt+' '+q.category).toLowerCase().includes(query)&&(!status.value||(status.value==='active')===q.active));
+      list.innerHTML=filtered.map(q=>'<div class="admin-row split"><div><strong>'+esc(q.prompt)+'</strong><br><small>'+esc(q.category)+' · '+fmt(q.answer)+' '+esc(q.unit)+' · '+(q.active?'Active':'Disabled')+'</small></div><button class="btn subtle" data-question="'+esc(q.id)+'">Edit</button></div>').join('')||empty('No questions match these filters.');
+      all('[data-question]',list).forEach(el=>el.onclick=()=>editQuestion(filtered.find(q=>q.id===el.dataset.question)));
+    };
+    search.oninput=renderQuestions;
+    status.onchange=renderQuestions;
+    renderQuestions();
+  }
   if($('#import-questions'))$('#import-questions').onclick=()=>{
-    const dialog=modal('Import question pack','<p class="small">Paste a JSON array. Each question needs prompt, category, unit, answer, scale, time, and active. Source is optional.</p><form class="stack">'+textarea('Question pack','pack','required')+err+'<button class="btn primary">Import questions</button></form>');
+    const dialog=modal('Import question pack','<p class="small">Paste a JSON array. Each question needs prompt, category, unit, answer, scale, time, and active. Source is optional.</p><form class="stack">'+field('Upload a JSON file','file','type="file" accept=".json,application/json"')+textarea('Or paste JSON','pack')+err+'<button class="btn primary">Import questions</button></form>');
     bindForm($('form',dialog),async fields=>{
       let questions;
-      try{questions=JSON.parse(fields.get('pack'));}catch{throw new Error('Enter a valid JSON array.');}
+      const file=fields.get('file'), pasted=String(fields.get('pack')).trim();
+      if(file.size&&pasted)throw new Error('Choose a file or paste JSON.');
+      if(file.size>140000)throw new Error('Choose a JSON file under 140 KB.');
+      const raw=file.size?await file.text():pasted;
+      try{questions=JSON.parse(raw);}catch{throw new Error('Enter a valid JSON array.');}
       await api('admin',{action:'import',questions});dialog.close();route(false);showToast('Question pack imported.');
     });
   };
+}
+async function contribute(version){
+  const intro=head('Community','Contribute to the game','Send in trivia questions or help expand the professor directory.');
+  const links='<div class="actions">'+button('Request a professor','request?kind=professor','subtle')+button('Request a school','request?kind=school','subtle')+'</div>';
+  if(!state.me){
+    page(intro+'<div class="panel stack"><h2>Submit a contribution</h2><p>Log in to send ideas and check whether they’ve been reviewed.</p><div class="actions"><button class="btn primary" id="contribute-login">Log in</button><button class="btn" id="contribute-signup">Create account</button></div></div>');
+    $('#contribute-login').onclick=noAuth;
+    $('#contribute-signup').onclick=()=>{returnTo='contribute';go('signup');};
+    return;
+  }
+  const submissions=await api('submissions');
+  if(version!==routeCounter)return;
+  const states={pending:'Pending review',approve:'Approved',reject:'Declined',hold:'On hold'};
+  const history=submissions.map(row=>'<div class="admin-row"><div class="split"><strong>'+esc(row.title)+'</strong><span class="pill">'+esc(states[row.status]??row.status)+'</span></div><small>'+date(row.date)+'</small>'+(row.decisionNote?'<p class="small">'+esc(row.decisionNote)+'</p>':'')+'</div>').join('');
+  page(intro+links+'<div class="section grid two"><form id="proposal" class="panel stack"><h2>Suggest a trivia question</h2><p class="small">Choose a question with one numeric answer. A moderator reviews submissions before they enter the arena.</p>'+field('Question','prompt','required maxlength="240"')+field('Category','category','required maxlength="32" placeholder="Space, history, sports…"')+field('Unit','unit','required maxlength="32" placeholder="years, km, %"')+field('Correct answer','answer','required type="number" min="0" max="1000000000000" step="any"')+field('HTTPS source link','source','required type="url"')+textarea('Note to the moderator (optional)','note','maxlength="600"')+err+'<div><button class="btn primary raised">Send for review</button></div></form><div class="panel"><h2>Your submissions</h2>'+ (history||empty('Your contributions will appear here.'))+'</div></div>');
+  bindForm($('#proposal'),async form=>{
+    const {note,answer,...details}=Object.fromEntries(form);
+    const number=Number(answer);
+    await api('request',{kind:'proposal',note,question:{...details,answer:number,time:25,scale:Math.max(1,Math.abs(number)*.25)}});
+    showToast('Question sent for review.');
+    route(false);
+  });
 }
 function editQuestion(q={time:25,active:true}){
   const dialog=modal(q.id?'Edit question':'Add question','<form class="stack">'+field('Prompt','prompt','required maxlength="240" value="'+esc(q.prompt)+'"')+field('Category','category','required maxlength="32" value="'+esc(q.category)+'"')+field('Unit','unit','required maxlength="32" value="'+esc(q.unit)+'"')+field('Answer','answer','required type="number" min="0" step="any" value="'+esc(q.answer)+'"')+field('Typical error scale','scale','required type="number" min="0.01" step="any" value="'+esc(q.scale)+'"')+field('Time limit in seconds','time','required type="number" min="10" max="120" value="'+q.time+'"')+field('Source URL (optional)','source','type="url" value="'+esc(q.source)+'"')+'<label><input type="checkbox" name="active" '+(q.active?'checked':'')+'> Active in battle rotation</label>'+err+'<button class="btn primary">Save question</button></form>');
@@ -442,6 +496,7 @@ async function route(scroll=true){
     else if(section==='login'||section==='signup')auth(section==='signup');
     else if(section==='fighter')fighter();
     else if(section==='recover')recovery();
+    else if(section==='contribute')await contribute(version);
     else if(section==='request')requestPage();
     else if(section==='admin')await admin(version);
     else if(section==='guidelines')guidelines();

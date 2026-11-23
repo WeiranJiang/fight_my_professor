@@ -1,0 +1,11 @@
+[
+  {
+    "prompt": "How many minutes are in a full week?",
+    "category": "Math",
+    "unit": "minutes",
+    "answer": 10080,
+    "scale": 4000,
+    "time": 25,
+    "active": true
+  }
+]

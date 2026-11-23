@@ -12,3 +12,24 @@
 .fighter-battle strong{width:fit-content;margin-inline:auto}
 .health{border-color:#504453}
 @media(max-width:450px){.hero-meter{width:37%}.fighter-battle strong{padding-inline:3px}.battle-stage{gap:6px}}
+@media(max-width:400px){.nav nav{gap:7px}.nav nav a{font-size:.78rem}}
+
+.directory-filters{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr);gap:12px;margin-bottom:14px}
+.directory-filters input,.directory-filters select{width:100%;min-width:0}
+.directory-list{background:#fff;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.directory-row{display:grid;grid-template-columns:42px minmax(0,1fr) auto;align-items:center;gap:14px;padding:12px 16px;min-height:68px}
+.directory-row+.directory-row{border-top:1px solid var(--line)}
+.directory-row:hover,.directory-row:focus-visible{background:#fff6dc}
+.directory-row:focus-visible{outline-offset:-3px}
+.directory-avatar{width:42px;height:46px;display:grid;place-items:center;background:var(--tint,#f2eafb);border-radius:7px}
+.directory-avatar .sprite{width:29px;image-rendering:pixelated}
+.directory-person{display:grid;gap:2px;min-width:0;overflow-wrap:anywhere}
+.directory-person strong{font-size:1rem}
+.directory-topics{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.directory-rating{font-size:.8rem;font-weight:750;color:#51453b;text-align:right}
+.directory-schools{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+.directory-count{margin:8px 0}
+.directory-footer{margin:16px 0 0}
+.faculty-title{font-size:.9rem;color:#625b50;margin-top:-5px}
+.research-list{padding-left:1.1rem;margin:.65rem 0 0;line-height:1.6}
+@media(max-width:520px){.directory-filters{grid-template-columns:1fr}.directory-row{gap:8px;padding:10px}.directory-rating{font-size:.72rem}.directory-topics{display:none}}

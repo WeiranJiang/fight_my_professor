@@ -1,1 +1,18 @@
-{"name":"fight-my-professor","private":true,"type":"module","scripts":{"start":"node server.mjs","test":"node --test"},"engines":{"node":">=22.13"}}
+{
+  "name": "fight-my-professor",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node --env-file-if-exists=.env server.mjs",
+    "dev": "node --watch --env-file-if-exists=.env server.mjs",
+    "test": "node --test",
+    "questions:check": "node scripts/check-questions.mjs",
+    "build": "node scripts/build-worker.mjs"
+  },
+  "engines": {
+    "node": ">=22.13"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2"
+  }
+}

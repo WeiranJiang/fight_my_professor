@@ -1,3 +1,4 @@
+import facultySnapshot from './data-source/faculty.json' with {type:'json'};
 import { seededAvatar } from './public/shared.js';
 
 const schools = [
@@ -38,9 +39,11 @@ const verifiedFaculty = [
   ['penn-ungar','Lyle Ungar','Computer and Information Science','penn','https://lifelongml.seas.upenn.edu/madna.github.io/team/'],
   ['michigan-mihalcea','Rada Mihalcea','Computer Science and Engineering','michigan','https://web.eecs.umich.edu/~mihalcea/contact.html']
 ];
-seedProfessors.push(...verifiedFaculty.map(([id,name,department,school,source])=>({
-  id,name,department,school,source,demo:false,base:Array(6).fill(60),
-  avatar:seededAvatar(id),tone:'blue',title:'Faculty Challenger'
+const facultyById = new Map(verifiedFaculty.map(([id,name,department,school,source])=>[id,{id,name,department,school,source}]));
+for (const row of facultySnapshot) facultyById.set(row.id,row);
+seedProfessors.push(...Array.from(facultyById.values(), row=>({
+  ...row,demo:false,base:Array(6).fill(60),
+  avatar:seededAvatar(row.id),tone:'blue',title:'Faculty Challenger'
 })));
 
 const nasa='https://science.nasa.gov/learn/basics-of-space-flight/chapter-1-the-solar-system/';

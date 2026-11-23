@@ -18,11 +18,15 @@ npm test
 
 The integration test starts a local server and uses a temporary database. It exercises guest and registered battles, turn validation, timeout handling, XP, character persistence, moderation, rankings, and password recovery.
 
+## Edit or contribute
+
+Run `npm run dev` for automatic server restarts while editing. Copy `.env.example` to `.env` to customize local settings. The [contributor guide](CONTRIBUTING.md) maps features to files and explains how to validate and share question packs.
+
 ## Directory and moderation
 
 The directory starts with 20 universities, three faculty profiles linked to official university sources, and six labeled fictional training opponents. Real faculty start from the same neutral gameplay prior. Demo profiles cannot receive official rankings. By default official faculty ranks require three ratings, and school ranks require two eligible faculty profiles.
 
-To create the first moderator, start the server with `FMP_ADMIN_EMAIL` and `FMP_ADMIN_CODE` set in its environment. Visit `/#signup?admin=1` and register the designated address with the code. Keep the code private and remove it from the server environment after enrollment. Select **Admin** to review proposals or reports, edit numeric questions, adjust balance settings, or view the audit log.
+To create the first moderator, set `FMP_ADMIN_EMAIL` and `FMP_ADMIN_CODE` in `.env` or in the server environment, then start the server. Visit `/#signup?admin=1` and register the designated address with the code. Keep the code private and remove it from the server environment after enrollment. Select **Admin** to review proposals or reports, edit numeric questions, adjust balance settings, or view the audit log.
 
 Accounts use email and password authentication. The app issues a private recovery key at signup and rotates it after successful recovery. Password recovery revokes all active sessions for the account.
 
@@ -38,4 +42,8 @@ Both fighters estimate the same number. The smaller absolute error wins the roun
 
 ## Hosting
 
-This app uses a long-running Node process and a writable SQLite database. For hosting, run a single instance on a Node host with a persistent volume for `FMP_DB`. Set `HOST=0.0.0.0` when the host requires it and `FMP_SECURE_COOKIES=1` when serving behind an HTTPS reverse proxy. Back up the SQLite database with SQLite's backup tooling.
+The hosted build runs as a Worker with the `DB` D1 binding in `.openai/hosting.json`. Run `npm ci` and `npm run build` to produce the deployment artifact. Sites applies the SQL migrations in `drizzle/`. The local SQLite file and hosted D1 database are separate. `/api/health` checks database readiness.
+
+For hosted moderation, set `FMP_ADMIN_EMAIL` and a strong secret `FMP_ADMIN_CODE` in the Site's runtime environment, deploy the environment change, then register at `/#signup?admin=1`. Use an address that has yet to register on the game. Remove the invite code and redeploy after the moderator is enrolled.
+
+Players can go to **Contribute** to suggest trivia, professors, and schools. The site shows them their submission status. Moderators review trivia in **Admin > Trivia Submissions** and check the linked source before approving a question. Approved questions enter the rotation automatically.

@@ -109,6 +109,7 @@ test('HTTP guest play, player progression, moderated directory, and persistence'
   const appearance=await player('request',{kind:'avatar',target:'vale',avatar:avatarChange});
   assert.notDeepEqual((await guest('professor?id=vale')).p.avatar,avatarChange);
   await player('admin',{id:appearance.id,action:'approve'},'POST',403);
+  await moderator('auth',{mode:'signup',email:'moderator@example.test',password:'moderator-pass-123',name:'Test Moderator'},'POST',403);
   await moderator('auth',{mode:'signup',email:'moderator@example.test',password:'moderator-pass-123',name:'Test Moderator',adminCode:'integration-invite'});
   await moderator('admin',{id:appearance.id,action:'approve'});
   assert.deepEqual((await guest('professor?id=vale')).p.avatar,avatarChange);
@@ -129,6 +130,24 @@ test('HTTP guest play, player progression, moderated directory, and persistence'
   }
   assert.equal((await guest('professor?id='+fixture.id)).p.rank,1);
   assert.equal((await guest('players')).length,1);
+  const question={prompt:'How many minutes are in a full week?',category:'Math',unit:'minutes',answer:10080,scale:4000,time:25,active:true};
+  const questionCount=(await moderator('admin')).questions.length;
+  assert.equal((await guest('health')).database,'ready');
+  const contribution={kind:'proposal',question:{...question,prompt:'How many hours are in a full week?',unit:'hours',answer:168,source:'https://www.nist.gov/'}};
+  await guest('request',contribution,'POST',401);
+  const proposal=await player('request',contribution);
+  assert.equal((await player('submissions')).find(x=>x.id===proposal.id).status,'pending');
+  assert.ok(!(await moderator('admin')).questions.some(q=>q.prompt===contribution.question.prompt));
+  await moderator('admin',{id:proposal.id,action:'approve'});
+  assert.equal((await player('submissions')).find(x=>x.id===proposal.id).status,'approve');
+  assert.ok((await moderator('admin')).questions.some(q=>q.prompt===contribution.question.prompt));
+
+  await player('admin',{action:'import',questions:[question]},'POST',403);
+  const invalidImport=await moderator('admin',{action:'import',questions:[question,null]},'POST',400);
+  assert.match(invalidImport.error,/Question 2/);
+  assert.equal((await moderator('admin')).questions.length,questionCount+1);
+  await moderator('admin',{action:'import',questions:[question]});
+  assert.ok((await moderator('admin')).questions.some(q=>q.prompt===question.prompt));
   const closed=once(server,'exit');server.kill();await closed;
   origin=await start();
   assert.deepEqual((await player('init')).me.avatar,custom);
