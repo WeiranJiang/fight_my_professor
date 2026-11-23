@@ -1,6 +1,16 @@
+# U.S. institution directory
+
+`schools.json` is generated from the [IPEDS HD2024 directory file](https://nces.ed.gov/ipeds/datacenter/data/HD2024.zip). It contains 5,875 active U.S. postsecondary institutions in the 50 states, D.C., and U.S. territories present in the dataset. The importer excludes administrative offices and institutions with recorded closure dates. The file stores names, cities, states or territories, institutional links, institution level, and public name aliases. The legacy 20 school IDs are mapped to their federal UNITIDs so existing URLs and faculty records remain valid.
+
+```sh
+python scripts/build-school-snapshot.py /path/to/HD2024.zip /tmp/schools-candidate.json
+```
+
+Compare the candidate to `data-source/schools.json` before replacing the published snapshot. Schools can accept verified faculty submissions even when the faculty dataset has no rows for them.
+
 # Faculty directory snapshot
 
-The November 23, 2026 snapshot contains 1,201 records across the 20 universities in the game. It covers selected departments, primarily computing, with additional mathematics, economics, and English listings. Schools are the existing game directory, with no ranking order implied.
+The November 23, 2026 snapshot contains 2,182 records across 41 institutions in the game. It covers selected departments, primarily computing, with additional mathematics, economics, and English listings. Schools are the existing game directory, with no ranking order implied.
 
 Each record stores a publicly listed name, school, department, appointment title when available, research areas when listed, and the official source URL. The snapshot excludes personal contact fields and game scores. An unrated fighter starts at the game's neutral baseline.
 

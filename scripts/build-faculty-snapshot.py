@@ -25,9 +25,23 @@ spec = {
 'penn-math':('https://www.math.upenn.edu/people/standing-faculty','.people-list li.row-fluid','h2','.span6 h3','.span6 p','a:has(h2)'),
 'berkeley-econ':('https://econ.berkeley.edu/people/faculty','.teaser_display','.display-name','.display-position','.research-fields span:not(.divider)','.display-name a'),
 'duke-english':('https://english.duke.edu/people/faculty','article:has(.member-card)','.member-card [role=heading]','.h6',None,'.member-card a'),
+'ipeds132903':('https://www.cs.ucf.edu/faculty-directory/','.eael-filterable-gallery-item-wrap[data-search-categories~="faculty"]','.fg-item-title',None,None,'.fg-layout-3-item-content > a'),
+'ipeds134097':('https://www.cs.fsu.edu/department/faculty/','article.faculty-card','.faculty-name','.faculty-title',None,'a.faculty-name'),
+'ipeds134130':('https://www.cise.ufl.edu/people/faculty/','.cn-list-item.vcard.individual.faculty','.fn','.title',None,'.cn-gridder-detail-link a'),
+'ipeds164988':('https://www.bu.edu/cs/about/people/faculty/','.profile-item:not(.affiliation-aff-faculty)','.profile-name','.profile-title',None,'.profile-link'),
+'ipeds193900':('https://engineering.nyu.edu/academics/departments/computer-science-and-engineering/faculty-and-staff','article.node--type-profile','.card-body h3','.field--name-field-title',None,'.card-body h3 a'),
+'ipeds199193':('https://csc.ncsu.edu/group/faculty/','.person-card','.person-card__info-container a.name','.person-card__info-container .title',None,'.person-card__info-container a.name'),
+'ipeds139755':('https://www.scs.gatech.edu/people/faculty','.profile-card__content','.card-block__title','.card-block__subtitle',None,'.card-block__title a'),
+'ipeds145637':('https://ischool.illinois.edu/people/faculty','.profile-teaser','.profile-teaser__name','.profile-teaser__title','.profile-teaser__list-definition','.profile-teaser__name a'),
+'ipeds243780':('https://www.cs.purdue.edu/people/faculty/index.html','.people-faculty-row .people-item','.people-name','.people-title',None,'.people-name a'),
+'ipeds153603':('https://www.cs.iastate.edu/people/faculty','article.isu-horizontal-card','.people-teaser-name','.isu-people_position-list li',None,'.people-teaser-name a'),
+'ipeds163286':('https://www.cs.umd.edu/people/faculty','.view-display-id-faculty .media-body','.media-heading',None,'a[href*="/research"]','.media-heading a'),
+'ipeds174066':('https://cse.umn.edu/cs/faculty-instructor-directory','.pl-col-two:has(.people-title)','.people-title','.people-jobroles',None,'.people-title a'),
+'ipeds228778':('https://www.cs.utexas.edu/people','.views-row:has(.views-field-field-contact-faculty-title)','.views-field-title','.views-field-field-contact-faculty-title','.views-field-field-research-groups a','.views-field-title a'),
+'ipeds236948':('https://www.cs.washington.edu/people/faculty/','.e-loop-item.faculty','p:has(a[aria-label^="Read the bio"])','p.elementor-heading-title:not(:has(a))',None,'p a[aria-label^="Read the bio"]'),
 'columbia-econ':('https://econ.columbia.edu/faculty/','.ts-faculty-main','.tshowcase-box-title','.tshowcase-single-position','.tshowcase-single-freehtml',None),
 }
-depts={'penn':'Computer and Information Science','penn-math':'Mathematics','mit':'Electrical Engineering and Computer Science','caltech':'Computing and Mathematical Sciences','columbia-econ':'Economics','berkeley-econ':'Economics','duke-english':'English'}
+depts={'ipeds145637':'Information Sciences','ipeds174066':'Computer Science and Engineering','penn':'Computer and Information Science','penn-math':'Mathematics','mit':'Electrical Engineering and Computer Science','caltech':'Computing and Mathematical Sciences','columbia-econ':'Economics','berkeley-econ':'Economics','duke-english':'English'}
 aliases={'penn':{'dinesh jayaraman':'penn-jayaraman','lyle ungar':'penn-ungar'},'michigan':{'rada mihalcea':'michigan-mihalcea'}}
 def clean(s): return ' '.join(s.split())
 def text(node): return clean(node.get_text(' ',strip=True)) if node else ''
@@ -37,7 +51,9 @@ def args(src):
  return src.split('-',1)[0],depts.get(src,'Computer Science')
 def record(school,dept,name,rank,topics,url):
  key=name.casefold()
- ident=aliases.get(school,{}).get(key,school+'-'+slug(name))
+ # The Purdue profile links are already public, so retain their historical ID prefix.
+ prefix={'ipeds243780':'ipeds151351','ipeds151351':'iu-bloomington'}.get(school,school)
+ ident=aliases.get(school,{}).get(key,prefix+'-'+slug(name))
  return dict(id=ident,school=school,department=dept,name=name,academicTitle=rank,research=topics,source=url)
 def topics_for(src,card,selector):
  if not selector:return []
@@ -75,6 +91,11 @@ def build_snapshot(input_folder, output_file):
         title=card.select_one(rank_selector)
         rank=next((clean(x) for x in title.find_all(string=True,recursive=False) if clean(x)),'') if title else ''
        elif src=='stanford': rank=text(card).removeprefix(name).strip()
+       elif src=='ipeds132903':
+        paragraph=card.select_one('.fg-item-content p')
+        rank=next((clean(x) for x in paragraph.find_all(string=True,recursive=False) if clean(x)),'') if paragraph else ''
+       elif src=='ipeds163286':
+        rank=next((clean(x) for x in card.find_all(string=True,recursive=False) if clean(x)), '')
        elif src=='cmu':
         node=card.select_one(rank_selector)
         rank=next((clean(part) for part in node.strings if clean(part) and clean(part)!=name),'') if node else ''
@@ -83,7 +104,13 @@ def build_snapshot(input_folder, output_file):
        # Exclude retired, affiliate-only, visiting, and adjunct entries from this snapshot.
        if re.search(r'emerit|post.tenure|visiting|adjunct|affiliated faculty|by courtesy',rank,re.I):continue
        if not re.search(r'professor|primary faculty|standing faculty',rank,re.I):continue
+       if src=='ipeds134097':
+        section=card.find_previous('h2',class_='section-title')
+        if text(section)!='Main Campus':continue
+       if src=='ipeds134130':
+        name=' '.join(text(part) for part in card.select('.given-name,.additional-name,.family-name'))
        if src in {'cmu','columbia','berkeley-econ'}:name=name_order(name)
+       if src=='ipeds243780' and 'West Lafayette' not in text(card.select_one('.people-campus')):continue
        if src=='caltech':
         if not re.search(r'comput|mathemat|data science',rank,re.I):continue
        if src=='harvard' and not re.search(r'comput|applied math|artificial intelligence',rank,re.I):continue
@@ -110,6 +137,69 @@ def build_snapshot(input_folder, output_file):
      ('ucla','Computer Science','Sandra Batista','Assistant Teaching Professor',[],'https://www.cs.ucla.edu/ucla-computer-science-welcomes-six-faculty-members-v1/'),
      ('vanderbilt','Computer Science','Jonathan Sprinkle','Professor and Department Chair',[],'https://engineering.vanderbilt.edu/departments/computer-science/'),
     ]
+    smc = 'https://www.smc.edu/academics/academic-departments/mathematics/contact.php'
+    ntu = 'https://www.navajotech.edu/faculty-staff/faculty-directory/engineering-math-and-technology/'
+    manual.extend(
+        ('ipeds122977','Mathematics',name,title,[],smc)
+        for name,title in [
+            ('Colleen McGraw','Department Chair'),('Brian Rodas','Assistant Chair'),
+            ('Alex Bene','Mathematics faculty'),('Sara Boosheri','Mathematics faculty'),
+            ('Andrew Nestler','Mathematics faculty'),('Diem Nguyen','Mathematics faculty'),
+        ]
+    )
+    manual.extend(
+        ('ipeds187596',department,name,title,[],ntu)
+        for department,name,title in [
+            ('Chemical Engineering','Mohammad Aliedeh','Associate Professor'),
+            ('Information Technology','Mohammad Reza Ali','Assistant Professor'),
+            ('Management Information Systems','Frances Ijeoma','Associate Professor'),
+            ('Computer Science','Bhagya M. Patil','Assistant Professor'),
+            ('Mechanical Engineering','Waled Mohammed','Assistant Professor'),
+        ]
+    )
+    manual.extend([
+        ('ipeds102553','Mathematics','Anthony Gaussoin','Assistant Professor',[],'https://directory.alaska.edu/Department/Detail/dir_UAA_msc_Mathematics'),
+        ('ipeds243197','Mathematical Sciences','Luis F. Cáceres','Professor',[],'https://www.uprm.edu/lcaceres/'),
+    ])
+    davis = 'https://cs.ucdavis.edu/directory'
+    virginia = 'https://engineering.virginia.edu/department/computer-science/faculty'
+    manual.extend(
+        ('ipeds110644','Computer Science',name,title,[],davis)
+        for name,title in [
+            ("Raissa M. D'Souza",'Professor and Associate Dean for Research'),
+            ('Ian Davidson','Professor'),('David Doty','Associate Professor'),
+            ('Kurt Eiselt','Professor of Teaching and Vice-Chair'),('Matthew Farrens','Professor'),
+            ('Vladimir Filkov','Professor'),('Alexander Gamero-Garrido','Assistant Professor'),
+            ('Lifu Huang','Associate Professor'),('Christopher Nitta','Professor of Teaching'),
+            ('Tapti Palit','Assistant Professor'),('Julian Panetta','Associate Professor'),
+            ('Joël Porquet-Lupine','Associate Professor of Teaching'),
+            ('Cindy Rubio González','Professor'),('Maike Sonnewald','Assistant Professor'),
+        ]
+    )
+    manual.extend([
+        ('ipeds234076','Computer Science','Hyojoon Kim','Assistant Professor',['Computer networks','Distributed systems'],virginia),
+        ('ipeds234076','Computer Science','Yen-Ling Kuo','Assistant Professor',['Robot learning','Human-robot interaction'],virginia),
+        ('ipeds234076','Computer Science','Adwait Jog','Associate Professor',['Computer architecture'],virginia),
+    ])
+    iub = 'https://ai.luddy.indiana.edu/people/faculty-by-department.html'
+    manual.extend(
+        ('ipeds151351',department,name,title,[topic],iub)
+        for department,name,title,topic in [
+            ('Computer Science','Saúl Blanco','Assistant Professor','Theoretical computer science'),
+            ('Computer Science','David Crandall','Luddy Professor','Computer vision'),
+            ('Computer Science','Memo Dalkilic','Professor','Data-centric AI'),
+            ('Computer Science','Jiangpeng He','Assistant Professor','Computer vision'),
+            ('Computer Science','Mohsen Heidari','Assistant Professor','Quantum and classical machine learning'),
+            ('Computer Science','Thai Le','Assistant Professor','Natural language processing'),
+            ('Computer Science','David Leake','Professor','Case-based reasoning'),
+            ('Computer Science','Byung-Cheol Min','Professor','Robotics'),
+            ('Computer Science','Christopher Raphael','Professor','Music informatics'),
+            ('Computer Science','Chung-chieh Shan','Associate Professor','Probabilistic programming'),
+            ('Informatics','Filippo Menczer','Luddy Distinguished Professor','Computational social science'),
+            ('Optometry','Kathryn Bonnen','Assistant Professor','Human vision'),
+            ('Statistics','Amanda Mejia','Associate Professor','Neuroimaging statistics'),
+        ]
+    )
     for values in manual:
      row=record(*values)
      rows[row['id']]=row

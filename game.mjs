@@ -24,3 +24,21 @@ export function resolveRound(q, estimate, bot, player, enemy, config, round) {
   const damage = tie?0:Math.max(1,Math.round(config.damage*(1.45-.64*Math.min(error/q.scale,1)) + attacker[0]/22 + bonus - defender[2]/32 - defender[1]/60));
   return {answer:q.answer, source:q.source, estimate, bot, playerError, botError, winner, damage, score};
 }
+
+export function resolveChoice(q, choice, botChoice, player, enemy, config, round) {
+  const quality=options=>q.kind==='rare'?Math.min(...options):Math.max(...options);
+  const weights=q.options.map(option=>option.weight);
+  const best=quality(weights), low=Math.min(...weights), high=Math.max(...weights);
+  const scoreFor=index=>{
+    if(index===null)return 0;
+    if(low===high)return 100;
+    const weight=weights[index];
+    return 10+Math.round(90*(q.kind==='rare'?(high-weight)/(high-low):(weight-low)/(high-low)));
+  };
+  const score=scoreFor(choice), botScore=scoreFor(botChoice);
+  // The numeric combat engine can reuse the normalized distance from 100.
+  const outcome=resolveRound({answer:100,scale:100},choice===null?null:score,botScore,player,enemy,config,round);
+  return {...outcome,kind:q.kind,estimate:choice===null?null:q.options[choice].text,
+    bot:q.options[botChoice].text,answer:q.options.filter(option=>option.weight===best).map(option=>option.text).join(' or '),
+    source:q.source,score,botScore};
+}

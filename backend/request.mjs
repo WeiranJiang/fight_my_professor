@@ -1,4 +1,4 @@
-import { options } from '../public/shared.js';
+import { eyeTraits, options } from '../public/shared.js';
 
 export const hex = buffer => Array.from(new Uint8Array(buffer), byte=>byte.toString(16).padStart(2,'0')).join('');
 export const uid = () => hex(crypto.getRandomValues(new Uint8Array(16)));
@@ -13,7 +13,7 @@ export const allowedUrl = raw => {
 };
 export const owned = u => { requireRule(u,'Log in to continue.',401); return u; };
 export const cleanAvatar = traits => Object.fromEntries(Object.entries(options).map(([key,variants])=>{
-  const n=traits?.[key]; requireRule(Number.isInteger(n)&&n>=0&&n<variants.length,'Invalid avatar option.');
+  const n=Object.hasOwn(traits??{},key)?traits[key]:eyeTraits[key]; requireRule(Number.isInteger(n)&&n>=0&&n<variants.length,'Invalid avatar option.');
   return [key,n];
 }));
 export function cookie(name,token,age,secure) {

@@ -17,6 +17,7 @@ snapshot = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(snapshot)
 
 PAGES = {
+    'ipeds139755': ('?page=', 5),
     'stanford': ('?page=', 4),
     'cmu': ('?page=', 6),
     'cornell': ('?page=', 8),

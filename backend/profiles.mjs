@@ -3,7 +3,7 @@ import { average, difficulty, level } from '../game.mjs';
 
 export const publicUser = (u,c) => ({id:u.id,name:u.name,school:u.school,avatar:u.avatar,xp:u.xp,level:level(u.xp,c),wins:u.wins,losses:u.losses,draws:u.draws??0,defeated:u.defeated,best:u.best,bosses:u.bosses,values:u.values});
 const facultyDetails = new Map(facultySnapshot.map(({id,academicTitle,research})=>[id,{academicTitle,research}]));
-export async function profiles(c, storage) {
+export async function profiles(c, storage, {includeSchools=false}={}) {
   const {list}=storage;
   const byProfessor = new Map();
   for (const rating of (await list('rating'))) {
@@ -19,14 +19,23 @@ export async function profiles(c, storage) {
     const power=Math.round(average(values));
     return {...facultyDetails.get(p.id),...p,values,power,count:reviews.length,eligible:!p.demo&&reviews.length>=c.minRatings,difficulty:difficulty(power,values[3])};
   }).sort((a,b)=>b.power-a.power||a.name.localeCompare(b.name));
-  const schools = (await list('school')).map(s=>{
-    const rated=people.filter(p=>p.school===s.id&&p.eligible);
-    return {...s,count:people.filter(p=>p.school===s.id).length,eligible:rated.length>=c.minProfessors,power:rated.length?Math.round(average(rated.map(p=>p.power))):null};
-  });
-  const rankable=people.filter(p=>p.eligible);
-  for(const p of rankable){
-    p.rank=rankable.indexOf(p)+1;
-    p.schoolRank=rankable.filter(x=>x.school===p.school).indexOf(p)+1;
+  const counts = new Map(), rates = new Map();
+  let rank=0;
+  for (const professor of people) {
+    const {school,eligible,power,demo}=professor;
+    if(!demo)counts.set(school,(counts.get(school)??0)+1);
+    if(!eligible)continue;
+    const rating=rates.get(school)??{count:0,total:0};
+    rating.count++;
+    rating.total+=power;
+    rates.set(school,rating);
+    professor.rank=++rank;
+    professor.schoolRank=rating.count;
   }
+  if(!includeSchools)return {people,byProfessor};
+  const schools = (await list('school')).map(s=>{
+    const rating=rates.get(s.id);
+    return {...s,count:counts.get(s.id)??0,eligible:Boolean(rating&&rating.count>=c.minProfessors),power:rating?Math.round(rating.total/rating.count):null};
+  });
   return {people,schools,byProfessor};
 }

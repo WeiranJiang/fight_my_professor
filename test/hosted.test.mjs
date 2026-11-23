@@ -3,11 +3,18 @@ import { test } from 'node:test';
 import { readFileSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 import { openD1 } from '../backend/d1.mjs';
+import { seedProfessors } from '../seed.mjs';
+import { schoolMarkSources } from '../public/school-marks.js';
 import { createHandler } from '../backend/http.mjs';
 
 test('hosted storage adapter seeds gameplay and atomically retries overlapping writes', async () => {
   const db=new DatabaseSync(':memory:');
   db.exec(readFileSync(new URL('../drizzle/0000_initial.sql',import.meta.url),'utf8'));
+  const purdue=seedProfessors.find(p=>p.school==='ipeds243780');
+  // Simulate a live row from before the campus correction.
+  db.prepare("INSERT INTO records VALUES ('professor',?,?)").run(
+    purdue.id,JSON.stringify({...purdue,school:'ipeds151351',title:'Existing fighter title'})
+  );
   const prepare=(sql,args=[])=>({
     bind:(...values)=>prepare(sql,values),
     first:async()=>db.prepare(sql).get(...args),
@@ -37,7 +44,13 @@ test('hosted storage adapter seeds gameplay and atomically retries overlapping w
   const {people,schools}=await init.json();
   assert.ok(people.some(p=>p.id==='vale'));
   const faculty=people.filter(p=>!p.demo);
-  assert.ok(faculty.length>=1200);
+  assert.ok(faculty.length>=2100);
+  assert.ok(schools.every(s=>Object.hasOwn(schoolMarkSources,s.id)));
+  const corrected=faculty.find(p=>p.id===purdue.id);
+  assert.equal(corrected.school,'ipeds243780');
+  assert.equal(corrected.title,'Existing fighter title');
+  assert.ok(faculty.filter(p=>p.school==='ipeds151351').every(p=>p.source.startsWith('https://ai.luddy.indiana.edu/')));
+  assert.ok(faculty.some(p=>p.school==='ipeds193900'));
   assert.ok(faculty.some(p=>p.school==='duke'&&p.department==='English'));
   assert.ok(faculty.some(p=>p.school==='berkeley'&&p.department==='Economics'));
   assert.equal(new Set(faculty.map(p=>p.id)).size,faculty.length);
@@ -60,9 +73,9 @@ test('hosted storage adapter seeds gameplay and atomically retries overlapping w
   assert.equal(first.status,200);
   assert.equal(second.status,200);
   const [left,right]=await Promise.all([first.json(),second.json()]);
-  assert.notEqual(left.id,right.id);
+  assert.equal(left.id,right.id);
   const recent=db.prepare("SELECT data FROM records WHERE type='recent'").get();
-  assert.equal(new Set(JSON.parse(recent.data)).size,14);
+  assert.equal(Object.keys(JSON.parse(recent.data)).length,7);
   assert.equal((await request('/api/health')).status,200);
   db.close();
 });

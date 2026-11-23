@@ -3,13 +3,14 @@ import { level } from '../../game.mjs';
 import { cleanAvatar, cookie, digest, owned, requireRule, uid, value } from '../request.mjs';
 import { publicUser } from '../profiles.mjs';
 
-async function recover({body, headers, secure, storage}) {
+async function recover({body, headers, secure, storage, env}) {
   const {one, write, get, put}=storage;
   const email=value(body.email,254).toLowerCase(), key=value(body.key,64).toLowerCase(), password=body.password;
   requireRule(/^[a-f0-9]{32}$/.test(key)&&typeof password==='string'&&password.length>=8&&password.length<=128,'Enter your recovery key and a password of 8–128 characters.');
   const row=(await one('SELECT id FROM users WHERE email=?',email));
   const expected=row?(await get('recovery',row.id)):null;
   requireRule(expected && await equalSecret(expected,await digest(key)),'Email or recovery key is incorrect.',401);
+  requireRule(email!==env.FMP_ADMIN_EMAIL?.toLowerCase()||password.toLowerCase()!==email,'Choose a private password different from the moderator email.');
   const replacement=uid();
   write('UPDATE users SET password=? WHERE id=?',await passwordHash(password),row.id);
   write('DELETE FROM sessions WHERE user_id=?',row.id);
@@ -33,14 +34,16 @@ async function auth({body, u, token, headers, secure, storage, env, legacyPasswo
   const {one, write, put, users}=storage;
   const email=value(body.email,254).toLowerCase(), password=body.password;
   requireRule(/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)&&typeof password==='string'&&password.length>=8&&password.length<=128,'Enter a valid email and a password of 8–128 characters.');
+  const reserved=Boolean(env.FMP_ADMIN_EMAIL&&email===env.FMP_ADMIN_EMAIL.toLowerCase());
+  const hasAdminInvite=()=>Boolean(env.FMP_ADMIN_CODE)&&equalSecret(body.adminCode,env.FMP_ADMIN_CODE);
+  requireRule(!reserved||password.toLowerCase()!==email,'Choose a private password different from the moderator email.');
   let recoveryKey;
   if(body.mode==='signup'){
     const name=value(body.name,28);
     requireRule(name.length>=2,'Choose a display name with at least 2 characters.');
     requireRule(!(await one('SELECT 1 FROM users WHERE email=?',email)),'An account already uses this email.',409);
     requireRule(!(await users()).some(account=>account.name.toLowerCase()===name.toLowerCase()),'Choose a different display name.',409);
-    const reserved=Boolean(env.FMP_ADMIN_EMAIL&&email===env.FMP_ADMIN_EMAIL.toLowerCase());
-    const admin=reserved&&Boolean(env.FMP_ADMIN_CODE&&await equalSecret(body.adminCode,env.FMP_ADMIN_CODE));
+    const admin=reserved&&await hasAdminInvite();
     requireRule(!reserved||admin,'This email requires a moderator invite code.',403);
     u={id:uid(),email,name,admin,school:null,avatar:null,values:[50,50,50,50,50,50],xp:0,wins:0,losses:0,draws:0,best:0,bosses:0,defeated:[],favorites:[],history:[]};
     write('INSERT INTO users VALUES (?,?,?,?)',u.id,email,await passwordHash(password),JSON.stringify(u));
@@ -50,6 +53,11 @@ async function auth({body, u, token, headers, secure, storage, env, legacyPasswo
     const row=(await one('SELECT password,data FROM users WHERE email=?',email));
     requireRule(await verifyPassword(password,row?.password,legacyPassword),'Email or password is incorrect.',401);
     u=JSON.parse(row.data);
+    if(reserved&&!u.admin&&body.adminCode){
+      requireRule(await hasAdminInvite(),'Moderator invite code is incorrect.',403);
+      u.admin=true;
+      write('UPDATE users SET data=? WHERE id=?',JSON.stringify(u),u.id);
+    }
   }
   if(token) write('DELETE FROM sessions WHERE token=?',await digest(token));
   const newToken=uid()+uid(), ttl=60*60*24*30;

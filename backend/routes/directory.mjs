@@ -2,12 +2,18 @@ import { level } from '../../game.mjs';
 import { tags } from '../../public/shared.js';
 import { allowedUrl, cleanAvatar, fail, owned, requireRule, timestamp, uid, value } from '../request.mjs';
 import { profiles } from '../profiles.mjs';
+import { challengeDay, earnedRematch } from '../daily-challenge.mjs';
 import { cleanQuestion } from '../questions.mjs';
 import { achievementNames } from '../progression.mjs';
 
 async function init({c, u, storage}) {
-  const {people,schools}=(await profiles(c, storage));
-  return {people,schools,settings:{prior:c.prior,priorWeight:c.priorWeight,minRatings:c.minRatings,minProfessors:c.minProfessors,levelXP:c.levelXP,winXP:c.winXP},me:u?{...u,level:level(u.xp,c),achievements:achievementNames(u)}:null};
+  const {people,schools}=await profiles(c, storage, {includeSchools:true});
+  const featured=schools.filter(s=>s.count||s.id===u?.school);
+  return {people,schools:featured,settings:{prior:c.prior,priorWeight:c.priorWeight,minRatings:c.minRatings,minProfessors:c.minProfessors,levelXP:c.levelXP,winXP:c.winXP},me:u?{...u,level:level(u.xp,c),achievements:achievementNames(u)}:null};
+}
+
+async function schools({c,storage}) {
+  return (await profiles(c,storage,{includeSchools:true})).schools;
 }
 
 async function favorite({body, u, c, storage}) {
@@ -22,17 +28,26 @@ async function professor({params, c, u, guest, storage}) {
   requireRule(p,'Professor not found.',404);
   const reviews=(byProfessor.get(id)??[]).sort((a,b)=>b.date.localeCompare(a.date)).map(({author,voters,...review})=>({...review,helpful:voters.length,voted:voters.includes(u?.id??guest),mine:u?.id===author}));
   const fought=await storage.battleCount(id);
-  return {p,reviews,fought};
+  const canRematch=!p.demo&&await earnedRematch(storage,id,u?.id,challengeDay(Date.now()));
+  return {p,reviews,fought,canRematch};
 }
 
 async function rating({method, body, u, storage}) {
   const {get, put, remove}=storage;
   owned(u); const p=(await get('professor',body.id)); requireRule(p&&p.published!==false,'Professor not found.',404);
   const id=p.id+':'+u.id;
-  if(method==='DELETE'){ remove('rating',id); return {}; }
+  const previous=await get('rating',id);
+  const origin=await get('rating-origin',id);
+  if(method==='DELETE'){
+    if(previous&&!origin)put('rating-origin',id,previous.createdAt??previous.date);
+    remove('rating',id);
+    return {};
+  }
   requireRule(Array.isArray(body.values)&&body.values.length===6&&body.values.every(n=>Number.isInteger(n)&&n>=1&&n<=5),'Rate each of the six attributes from 1 to 5.');
   const selected=Array.isArray(body.tags)?[...new Set(body.tags.filter(t=>tags.includes(t)))].slice(0,3):[];
-  put('rating',id,{id,professor:p.id,author:u.id,values:body.values,tags:selected,course:value(body.course,24),comment:value(body.comment,600),date:timestamp(),voters:(await get('rating',id))?.voters??[]});
+  const date=timestamp(), createdAt=origin??previous?.createdAt??previous?.date??date;
+  if(!origin)put('rating-origin',id,createdAt);
+  put('rating',id,{id,professor:p.id,author:u.id,values:body.values,tags:selected,course:value(body.course,24),comment:value(body.comment,600),date,createdAt,voters:previous?.voters??[]});
   return {};
 }
 
@@ -88,6 +103,7 @@ async function submissions({u,storage}) {
 export default {
   'GET /api/submissions': submissions,
   'GET /api/init': init,
+  'GET /api/schools': schools,
   'POST /api/favorite': favorite,
   'GET /api/professor': professor,
   'POST /api/rating': rating,

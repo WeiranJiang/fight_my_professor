@@ -1,3 +1,4 @@
+import { extraTrivia } from './extra-trivia.mjs';
 import facultySnapshot from './data-source/faculty.json' with {type:'json'};
 import { seededAvatar } from './public/shared.js';
 
@@ -86,3 +87,5 @@ const rows = [
  ['zero',math,'How many trailing zeros are in one million?',6,4,'zeros',null]
 ];
 export const seedQuestions = rows.map(([id,category,prompt,answer,scale,unit,source])=>({id,category,prompt,answer,scale,unit,source,time:25,active:true}));
+
+seedQuestions.push(...extraTrivia);

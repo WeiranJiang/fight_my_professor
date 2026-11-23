@@ -3,7 +3,7 @@ import { build } from 'esbuild';
 import { assets } from '../backend/http.mjs';
 
 const publicFiles=await Promise.all(Object.values(assets).map(async ([name])=>[
-  name,await readFile(new URL('../public/'+name,import.meta.url),'utf8')
+  name,await readFile(new URL('../public/'+name,import.meta.url),name.endsWith('.png')?'base64':'utf8')
 ]));
 await build({
   entryPoints:['worker/index.js'],

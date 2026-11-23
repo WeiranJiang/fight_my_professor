@@ -1,12 +1,13 @@
 import { DEFAULTS } from '../../game.mjs';
 import { seededAvatar } from '../../public/shared.js';
 import { allowedUrl, requireRule, timestamp, uid, value } from '../request.mjs';
+import { dailyQuestions } from '../question-bank.mjs';
 import { cleanQuestion, cleanQuestionPack } from '../questions.mjs';
 
 async function admin({method, body, u, c, storage}) {
   const {get, put, list, remove, users}=storage;
   requireRule(u?.admin,'Admin access required.',403);
-  if(method==='GET') return {requests:(await list('request')).sort((a,b)=>b.date.localeCompare(a.date)),questions:(await list('question')),config:c,users:(await users()).map(({id,name,email,admin,xp})=>({id,name,email,admin,xp})),audit:(await list('audit')).sort((a,b)=>b.date.localeCompare(a.date))};
+  if(method==='GET') return {requests:(await list('request')).sort((a,b)=>b.date.localeCompare(a.date)),questions:(await list('question')),daily:dailyQuestions(Date.now(),1).map(({prompt,kind,category})=>({prompt,kind,category})),config:c,users:(await users()).map(({id,name,email,admin,xp})=>({id,name,email,admin,xp})),audit:(await list('audit')).sort((a,b)=>b.date.localeCompare(a.date))};
   if(method==='POST'){
     const {action}=body;
     if(action==='question'){

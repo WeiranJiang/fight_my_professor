@@ -1,10 +1,12 @@
+import { schoolMarkSources } from '../public/school-marks.js';
 import { cookie, digest, fail, requireRule, uid } from './request.mjs';
 import account from './routes/account.mjs';
+import contact from './routes/contact.mjs';
 import admin from './routes/admin.mjs';
 import battle from './routes/battle.mjs';
 import directory from './routes/directory.mjs';
 
-const routes = { ...account, ...admin, ...battle, ...directory };
+const routes = { ...account, ...admin, ...battle, ...contact, ...directory };
 const authPaths=new Set(['/api/auth','/api/recover','/api/recovery-key']);
 const limit=150000;
 
@@ -13,13 +15,20 @@ export const securityHeaders = {
   'Referrer-Policy':'strict-origin-when-cross-origin',
   'Content-Security-Policy':"default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; base-uri 'none'; frame-ancestors 'self'"
 };
+const pagePaths=new Set(['/search','/fight','/rankings','/schools','/school','/contribute',
+  '/guidelines','/contact','/login','/signup','/recover','/fighter','/fighter/edit','/professor',
+  '/player','/battle','/request','/admin']);
 export const assets={
   '/':['index.html','text/html'],
   '/app.js':['app.js','text/javascript'],
   '/shared.js':['shared.js','text/javascript'],
   '/style.css':['style.css','text/css'],
   '/arena.svg':['arena.svg','image/svg+xml'],
-  '/robots.txt':['robots.txt','text/plain']
+  '/robots.txt':['robots.txt','text/plain'],
+  '/school-marks.js':['school-marks.js','text/javascript'],
+  ...Object.fromEntries(Object.keys(schoolMarkSources).map(id=>[
+    '/school-marks/'+id+'.png',['school-marks/'+id+'.png','image/png']
+  ]))
 };
 
 async function readBody(request, origin) {
@@ -60,9 +69,11 @@ export function createHandler({ withStore, readAsset, env={}, legacyPassword }) 
     const url=new URL(request.url), method=request.method;
     const headers=new Headers(securityHeaders);
     if(!url.pathname.startsWith('/api/')){
-      const asset=Object.hasOwn(assets,url.pathname)?assets[url.pathname]:null;
+      const asset=pagePaths.has(url.pathname)?assets['/']:Object.hasOwn(assets,url.pathname)?assets[url.pathname]:null;
       if(!asset||!['GET','HEAD'].includes(method))return new Response('Page not found',{status:404,headers});
-      headers.set('Content-Type',asset[1]+'; charset=utf-8');
+      const binary=asset[1].startsWith('image/')&&!asset[1].endsWith('+xml');
+      headers.set('Content-Type',binary?asset[1]:asset[1]+'; charset=utf-8');
+      headers.set('Cache-Control',binary?'public, max-age=3600':'no-cache');
       return new Response(method==='HEAD'?null:await readAsset(asset[0]),{headers});
     }
     headers.set('Cache-Control','no-store');
@@ -76,7 +87,17 @@ export function createHandler({ withStore, readAsset, env={}, legacyPassword }) 
       requireRule(handle,'Page not found.',404);
       const mutating=method!=='GET';
       const body=mutating?await readBody(request,url.origin):{};
-      if(authPaths.has(url.pathname)||['/api/request','/api/helpful','/api/battle/start'].includes(url.pathname))rateLimit(address,url.pathname);
+      if(authPaths.has(url.pathname)||['/api/request','/api/contact','/api/helpful','/api/battle/start'].includes(url.pathname))rateLimit(address,url.pathname);
+      if(authPaths.has(url.pathname)&&typeof body.email==='string'&&body.email.length<=254){
+        const key=await digest(address+'|'+body.email.trim().toLowerCase());
+        await withStore(true,async storage=>{
+          const now=Date.now();
+          const limit=await storage.get('auth-limit',key);
+          const bucket=limit?.until>now?limit:{count:0,until:now+600000};
+          requireRule(bucket.count<12,'Too many attempts for this account. Try again in ten minutes.',429);
+          storage.put('auth-limit',key,{...bucket,count:bucket.count+1});
+        });
+      }
       const cookies=Object.fromEntries((request.headers.get('cookie')??'').split(';').map(pair=>pair.trim().split('=')));
       const token=/^[a-f0-9]{64}$/.test(cookies.fmp_session??'')?cookies.fmp_session:null;
       const tokenDigest=token?await digest(token):null;

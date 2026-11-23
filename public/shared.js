@@ -11,10 +11,23 @@ export const options = {
   pants: ['Jeans','Slacks','Shorts','Casual'],
   pantsColor: ['#3d4866','#514355','#786757','#405444'],
   shoes: ['Sneakers','Dress shoes','Boots'],
-  prop: ['None','Tie','Bow tie','Cap','Book','Clipboard','Laptop','Coffee']
+  prop: ['None','Tie','Bow tie','Cap','Book','Clipboard','Laptop','Coffee'],
+  eyeShape: ['Dot','Round','Oval','Sleepy'],
+  eyeSize: ['Small','Medium','Large'],
+  eyeColor: ['#282335','#714334','#336bb4','#26815f','#9a661a','#8052a1','#b34f78']
 };
 export const defaultAvatar = Object.fromEntries(Object.keys(options).map(key => [key, 0]));
-export const colors = new Set(['skin','hairColor','shirtColor','pantsColor']);
+export const colors = new Set(['skin','hairColor','shirtColor','pantsColor','eyeColor']);
+export const eyeColorNames = ['Ink','Brown','Blue','Green','Amber','Violet','Rose'];
+export const eyeTraits = Object.freeze({eyeShape:0,eyeSize:0,eyeColor:0});
+
+// Three rows per eye. The middle column sits on the original one-pixel dot.
+const eyePatterns = [
+  [['...','.#.','...'],['.##','.##','...'],['###','###','###']],
+  [['.#.','.#.','...'],['.#.','###','.#.'],['.##','###','##.']],
+  [['.#.','.#.','.#.'],['.##','.##','.#.'],['.##','###','###']],
+  [['...','.##','...'],['...','###','...'],['#..','.##','...']]
+];
 export function seededAvatar(id) {
   let seed = [...id].reduce((n,c) => Math.imul(n ^ c.charCodeAt(0), 16777619) >>> 0, 2166136261);
   return Object.fromEntries(Object.entries(options).map(([key, values]) => {
@@ -23,6 +36,8 @@ export function seededAvatar(id) {
   }));
 }
 export function avatar(a = defaultAvatar) {
+  const {eyeShape,eyeSize,eyeColor} = {...eyeTraits,...a};
+  const widerEyes = eyeShape!==0 || eyeSize!==0;
   const ink = '#282335', skin = options.skin[a.skin], hair = options.hairColor[a.hairColor];
   const shirt = options.shirtColor[a.shirtColor], pants = options.pantsColor[a.pantsColor];
   const r = (x,y,w,h,fill=ink) => '<rect x="'+x+'" y="'+y+'" width="'+w+'" height="'+h+'" fill="'+fill+'"/>';
@@ -45,20 +60,26 @@ export function avatar(a = defaultAvatar) {
   if (a.shirt>1) px += r(11,21,2,2,'#fff2ce')+r(12,23,1,3,a.shirt===7?shirt:'#302334');
   px += r(8,5,8,1)+r(6,6,12,2)+r(5,8,14,9)+r(7,17,10,3)+r(6,9,12,8,skin)+r(8,7,8,12,skin);
   px += hairline[a.hair].map(part=>r(...part,hair)).join('');
-  // Keep two tiny dot eyes readable, including through glasses.
   px += r(8,16,1,1,'#df866d')+r(15,16,1,1,'#df866d')+r(11,17,2,1,'#a35b52');
   if (a.glasses) {
     const rounded = a.glasses===1;
-    const top = a.glasses===3?12:11;
+    const top = a.glasses===3&&!widerEyes?12:11;
+    const width = widerEyes?5:4;
     const frame = a.glasses===4?ink:'#64505a';
-    for (const x of [7,13]) {
+    for (const x of [7,widerEyes?12:13]) {
       const inset = rounded?1:0;
-      px += r(x+inset,top,4-2*inset,1,frame)+r(x+inset,15,4-2*inset,1,frame);
-      px += r(x,top+1,1,14-top,frame)+r(x+3,top+1,1,14-top,frame);
+      px += r(x+inset,top,width-2*inset,1,frame)+r(x+inset,15,width-2*inset,1,frame);
+      px += r(x,top+1,1,14-top,frame)+r(x+width-1,top+1,1,14-top,frame);
     }
     px += r(11,top+1,2,1,frame);
   }
-  px += r(9,13,1,1)+r(14,13,1,1);
+  const iris = options.eyeColor[eyeColor];
+  const pattern = eyePatterns[eyeShape][eyeSize];
+  for (const [row,pixels] of pattern.entries()) {
+    for (let column=0;column<pixels.length;column++) {
+      if (pixels[column]==='#') px += r(8+column,12+row,1,1,iris)+r(15-column,12+row,1,1,iris);
+    }
+  }
   if (a.beard) px += r(a.beard===3?11:9, a.beard===3?17:16,a.beard===3?2:6,1,hair)+(a.beard===2?r(9,17,6,2,hair):'');
   if (a.prop===1 || a.prop===2) px += r(a.prop===1?11:9,20,a.prop===1?2:6,a.prop===1?5:2,'#de685c');
   if (a.prop===3) px += r(5,3,14,2)+r(8,5,8,2)+r(17,5,1,4,'#e9af45');

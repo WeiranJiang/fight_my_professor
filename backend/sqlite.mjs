@@ -1,7 +1,7 @@
 import { mkdirSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
-import { seedRecords, store } from './storage.mjs';
+import { correctFacultyAffiliations, seedRecords, store } from './storage.mjs';
 
 export function openSQLite(filename) {
   const file = resolve(filename);
@@ -9,6 +9,7 @@ export function openSQLite(filename) {
   const db = new DatabaseSync(file);
   db.exec('PRAGMA busy_timeout=5000; PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;');
   db.exec(readFileSync(new URL('../drizzle/0000_initial.sql',import.meta.url),'utf8'));
+  db.exec(correctFacultyAffiliations);
   const insert=db.prepare('INSERT OR IGNORE INTO records VALUES (?,?,?)');
   for (const row of seedRecords) insert.run(...row);
   const storage=store({

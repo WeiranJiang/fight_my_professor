@@ -1,12 +1,12 @@
-import { seedRecords, store } from './storage.mjs';
+import { correctFacultyAffiliations, seedRecords, store } from './storage.mjs';
 import { fail } from './request.mjs';
 
 async function seed(db) {
   // Seed inserts preserve changes made by moderators to existing records.
-  const key='faculty-directory-2026-11-23-v2';
+  const key='bank-and-faculty-2026-11-23-trivia';
   const marker=await db.prepare("SELECT 1 FROM records WHERE type='seed' AND id=?").bind(key).first();
   if (marker) return;
-  const statements=[];
+  const statements=[db.prepare(correctFacultyAffiliations)];
   // Thirty records per statement stays below D1's bound parameter limit.
   for (let offset=0;offset<seedRecords.length;offset+=30) {
     const rows=seedRecords.slice(offset,offset+30);
