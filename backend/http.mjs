@@ -16,7 +16,7 @@ export const securityHeaders = {
   'Content-Security-Policy':"default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; base-uri 'none'; frame-ancestors 'self'"
 };
 const pagePaths=new Set(['/search','/fight','/rankings','/schools','/school','/contribute',
-  '/guidelines','/contact','/login','/signup','/recover','/fighter','/fighter/edit','/professor',
+  '/contact','/login','/signup','/recover','/fighter','/fighter/edit','/professor',
   '/player','/battle','/request','/admin']);
 export const assets={
   '/':['index.html','text/html'],

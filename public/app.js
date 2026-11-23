@@ -9,7 +9,6 @@ const pick=(a,b)=>a===b?'selected':'';
 const fmt=n=>n===null?'Timed out':Number(n).toLocaleString('en-US',{maximumFractionDigits:2});
 const date=s=>new Date(s).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
 const sprite=(a,classes='')=>'<img class="sprite '+classes+'" src="'+avatar(a)+'" alt="" aria-hidden="true">';
-const searchIcon='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg>';
 const bolt='<span aria-hidden="true">⚡</span>';
 const empty=(message)=>'<div class="empty">'+message+'</div>';
 let state={people:[],schools:[],me:null}, timer, toastTimer, routeCounter=0, returnTo='', activeDialog;
@@ -35,7 +34,6 @@ const go=path=>{
 };
 const button=(label,href,classes='')=>'<a class="btn '+classes+'" href="'+esc(pageURL(href))+'">'+label+'</a>';
 const head=(label,title,description='')=>'<div class="page-title">'+(label?'<span class="eyebrow">'+label+'</span>':'')+'<h1>'+title+'</h1>'+(description?'<p class="muted">'+description+'</p>':'')+'</div>';
-const sectionHead=(label,title,action='',subtitle='')=>'<div class="section-head"><div><span class="eyebrow">'+label+'</span><h2>'+title+'</h2>'+(subtitle?'<p class="muted">'+subtitle+'</p>':'')+'</div>'+action+'</div>';
 const score=(n,label='POWER')=>'<div class="score">'+n+'<span>'+label+'</span></div>';
 const schoolName=id=>esc(school(id)?.name??'Independent');
 const linkProf=id=>'professor?id='+qs(id);
@@ -94,30 +92,16 @@ function schoolMark(s){
 }
 const schoolCard=s=>'<a class="school-card" href="/'+linkSchool(s.id)+'">'+schoolMark(s)+'<h3>'+esc(s.name)+'</h3><small>'+esc(s.location)+' · '+(s.count?s.count+' '+(s.count===1?'faculty profile':'faculty profiles'):'Faculty roster pending')+'</small></a>';
 function home(){
-  const top=state.people.filter(p=>p.eligible).slice(0,4);
-  app.innerHTML='<section class="hero"><div class="wrap hero-inner"><div><span class="eyebrow">'+bolt+' Rate. Rank. Fight.</span><h1>Think you can<br>beat your <span>professor?</span></h1><p class="lede">A professor awaits every day. Play trivia as a guest or build your own pixel fighter.</p><form id="hero-search" class="searchbox" role="search">'+searchIcon+'<input name="q" aria-label="Search for a professor or university" placeholder="Search for a professor or university" autocomplete="off"><button class="btn primary">Find a professor</button><div class="suggestions"></div></form><div class="hero-actions">'+button(bolt+' Play today’s challenge','fight','dark')+'<small>No account needed.</small></div></div><aside class="arcade" id="daily-preview"><div class="arcade-top pixel">Daily professor challenge</div></aside></div></section>'+
-    '<section class="section wrap">'+sectionHead('','Strongest professors',button('View rankings','rankings','subtle'))+'<div class="panel mini-list">'+(top.length?top.map(p=>'<a href="/'+linkProf(p.id)+'"><span>#'+p.rank+'</span><strong>'+esc(p.name)+'</strong>'+score(p.power)+'</a>').join(''):empty('Professors appear here after '+state.settings.minRatings+' community ratings.'))+'</div></section>';
+  app.innerHTML='<section class="daily-home"><header><h1>Fight My Professor</h1><p class="daily-kicker pixel">Daily Challenge – Professor of the Day</p></header>'+
+    '<div id="daily-preview" class="daily-preview" aria-busy="true"></div>'+
+    '<div class="daily-entry">'+button('Play challenge','fight','primary')+'</div></section>';
   const preview=$('#daily-preview');
   api('challenge').then(({professor:p})=>{
     if(!preview.isConnected)return;
-    preview.innerHTML='<div class="arcade-top pixel">Daily professor challenge</div><div class="showdown"><div class="hero-meter left">YOU<span><i></i></span></div><div class="hero-meter right">'+esc(p.name)+'<span><i></i></span></div>'+sprite(state.me?.avatar??defaultAvatar,'left-sprite')+sprite(p.avatar,'right-sprite')+'<div class="arcade-vs">VS</div></div><div class="arcade-bottom pixel"><span>'+schoolName(p.school)+'</span><a href="/fight">Play today</a></div>';
-  }).catch(()=>{if(preview.isConnected)preview.innerHTML='<div class="arcade-top">'+button('Open the arena','fight','primary')+'</div>';});
-  const form=$('#hero-search'), input=form.elements.q, suggestions=$('.suggestions',form);
-  form.onsubmit=e=>{e.preventDefault();go('search?q='+qs(input.value.trim()));};
-  const suggest=()=>{
-    const query=input.value.toLowerCase().trim();
-    const entries=[...state.schools.filter(s=>matchesSchool(s,normalizeSearch(query))).map(s=>[s.name,'University',linkSchool(s.id)]),...state.people.filter(p=>normalizeSearch(p.name).includes(normalizeSearch(query))).map(p=>[p.name,p.demo?'Demo professor':p.department,linkProf(p.id)])];
-    suggestions.innerHTML=query?entries.slice(0,6).map(([name,type,link])=>'<a href="/'+link+'"><strong>'+esc(name)+'</strong><small>'+esc(type)+'</small></a>').join(''):'';
-  };
-  input.oninput=()=>{
-    suggest();
-    if(!allSchoolsLoaded&&input.value.trim()){
-      loadSchoolDirectory().then(()=>{if(document.activeElement===input)suggest();}).catch(()=>{});
-    }
-  };
-  form.addEventListener('focusout',event=>{if(!form.contains(event.relatedTarget))suggestions.replaceChildren();});
-  input.addEventListener('focus',()=>input.oninput());
-  input.addEventListener('keydown',event=>{if(event.key==='Escape')suggestions.replaceChildren();if(event.key==='ArrowDown'&&$('a',suggestions)){event.preventDefault();$('a',suggestions).focus();}});
+    const player={name:state.me?.name??'Campus Challenger',avatar:state.me?.avatar??defaultAvatar,level:state.me?.level??1};
+    preview.innerHTML='<div class="battle-stage challenge-preview">'+combatant(player,100,100,'',true)+'<span class="pixel">VS</span>'+combatant(p,100,100,'',true)+'</div>'+
+      '<p class="daily-school">'+schoolName(p.school)+'</p>';
+  }).catch(()=>{}).finally(()=>preview.removeAttribute('aria-busy'));
 }
 const directoryOrder=new Intl.Collator('en',{sensitivity:'base'});
 const normalizeSearch=value=>value.normalize('NFKD').replace(/\p{M}/gu,'').toLowerCase().trim();
@@ -150,7 +134,7 @@ function directoryRow(p){
 }
 function search(){
   const query=params().get('q')??'', campus=params().get('school')??'';
-  page(head('','Faculty Directory','Search by professor, university, department, or research topic.')+
+  page(head('','Faculty Directory')+
     '<div class="filters directory-filters"><input id="query" type="search" aria-label="Search faculty directory" placeholder="Name, school, or research topic" value="'+esc(query)+'">'+schoolPicker('school-filter','School',campus)+'</div><div id="search-results"></div><p class="directory-footer">'+button('Request a professor','request?kind=professor'+(campus?'&school='+qs(campus):''),'subtle')+'</p>');
   bindSchoolPicker('school-filter');
   const input=$('#query'),select=$('#school-filter'),results=$('#search-results');
@@ -173,7 +157,7 @@ function search(){
 }
 function schools(){
   const states=[...new Set(state.schools.map(s=>s.state).filter(Boolean))].sort();
-  page(head('','U.S. Schools','Find colleges, universities, and technical schools in the federal postsecondary directory.')+
+  page(head('','Colleges')+
     '<div class="filters"><input id="school-query" type="search" aria-label="Search schools" placeholder="School name, city, or abbreviation" value="'+esc(params().get('q')??'')+'"><select id="school-state" aria-label="Filter by state or territory"><option value="">All states and territories</option>'+states.map(code=>'<option>'+esc(code)+'</option>').join('')+'</select><select id="faculty-filter" aria-label="Filter by faculty coverage"><option value="">All schools</option><option value="listed">With faculty profiles</option></select></div><p id="school-count" class="small"></p><div id="schools" class="grid three school-grid"></div><div class="directory-footer actions"><button class="btn subtle" id="more-schools" hidden>Show more schools</button>'+button('Request a school','request?kind=school','subtle')+'</div>');
   const input=$('#school-query'), region=$('#school-state'), faculty=$('#faculty-filter'), more=$('#more-schools');
   const pageSize=24;
@@ -217,7 +201,7 @@ function bindForm(form,submit){
   };
 }
 function auth(signup){
-  page('<div class="auth">'+head('Campus arcade',signup?'Join the arena':'Welcome back',signup?'Create an account to rate professors and level up your fighter.':'Log in to manage your fighter and community ratings.')+
+  page('<div class="auth">'+head('',signup?'Create an account':'Log in')+
     '<form class="panel stack" id="auth">'+(signup?field('Display name','name','required minlength="2" maxlength="28" autocomplete="nickname"'):'')+field('Email','email','required type="email" autocomplete="email"')+field('Password','password','required type="password" minlength="8" maxlength="128" autocomplete="'+(signup?'new-password':'current-password')+'"')+(params().has('admin')?field('Admin invite code','adminCode','type="password" autocomplete="off"'):'')+err+'<button class="btn primary raised">'+(signup?'Create account':'Log in')+'</button><small>'+(signup?'Already have an account? <a class="text-link" href="/login">Log in</a>':'New here? <a class="text-link" href="/signup">Create an account</a>')+'</small></form></div>');
   if(!signup)$('#auth').insertAdjacentHTML('beforeend','<div class="actions"><a class="text-link small" href="/recover">Use a recovery key</a><a class="text-link small" href="/login?admin=1">Moderator login</a>'+(params().has('admin')?'<a class="text-link small" href="/signup?admin=1">Set up a moderator account</a>':'')+'</div>');
   bindForm($('#auth'),async data=>{
@@ -358,7 +342,7 @@ function playerProfile(user,isMe=false){
 }
 function ranks(){
   const initial=params().get('school')??'';
-  page(head('','Strongest professors','Ranked by overall game power from community ratings.')+
+  page(head('','Strongest professors')+
     '<div class="filters">'+schoolPicker('rank-school','University',initial)+'</div><div class="panel" id="rank-list"></div>');
   bindSchoolPicker('rank-school');
   const campus=$('#rank-school');
@@ -375,10 +359,10 @@ async function arena(version){
   const match=await api('challenge'+(rematch?'?rematch='+qs(rematch):''));
   if(version!==routeCounter)return;
   const {professor:p}=match;
-  const type=rematch?'Bonus match':'Daily challenge';
+  const title=rematch?'Bonus match':'Daily Challenge – Professor of the Day';
   const opponent='<div class="battle-stage challenge-preview">'+combatant({name:state.me?.name??'Campus Challenger',avatar:state.me?.avatar??defaultAvatar,level:state.me?.level??1},100,100,'',true)+'<span class="pixel">VS</span>'+combatant(p,100,100,'',true)+'</div>';
   const links='<div class="actions">'+button('View professor',linkProf(p.id),'subtle')+(state.me?button('Customize your fighter','fighter?edit=1','subtle'):'<a class="btn subtle" href="/signup">Create a fighter</a>')+'</div>';
-  const intro=head('Campus arena',type,rematch?'A bonus match earned by rating this professor.':'Face today’s professor. The challenge resets at midnight Eastern time.');
+  const intro=head('',title);
   if(match.battleId){
     page('<div class="battle">'+intro+opponent+'<div class="panel battle-question stack"><h2>'+esc(p.name)+'</h2><p>'+(match.status==='finished'?'You finished this challenge.':'Your match is already underway.')+'</p><div class="actions">'+button(match.status==='finished'?'View result':'Continue match','battle?id='+qs(match.battleId),'primary raised')+'</div>'+links+'</div></div>');
     return;
@@ -387,7 +371,7 @@ async function arena(version){
     page('<div class="battle">'+intro+opponent+'<div class="panel battle-question stack"><h2>'+esc(p.name)+'</h2><p>Submit your first rating for this professor to unlock a bonus match.</p>'+links+'</div></div>');
     return;
   }
-  page('<div class="battle">'+intro+opponent+'<form id="daily-battle" class="panel battle-question stack"><div><h2>'+esc(p.name)+'</h2><p class="small">'+schoolName(p.school)+' · '+esc(p.department)+'</p></div><label class="field">Question format<select name="playlist"><option value="mixed">Mixed trivia</option><option value="estimate">Estimation</option><option value="rare">Find the rarest answer</option><option value="common">Find the most common answer</option></select></label>'+err+'<div class="actions"><button class="btn primary raised">'+bolt+(rematch?' Start bonus match':' Play today’s challenge')+'</button>'+button('View professor',linkProf(p.id),'subtle')+'</div>'+(!state.me?'<small>Play with the default fighter. <a class="text-link" href="/signup">Create an account</a> to customize your fighter and earn XP.</small>':'')+'</form></div>');
+  page('<div class="battle">'+intro+opponent+'<form id="daily-battle" class="panel battle-question stack"><div><h2>'+esc(p.name)+'</h2><p class="small">'+schoolName(p.school)+' · '+esc(p.department)+'</p></div><label class="field question-format">Question format<select name="playlist"><option value="mixed">Mixed trivia</option><option value="estimate">Estimation</option><option value="rare">Rarest answer</option><option value="common">Most common answer</option></select></label>'+err+'<div class="actions"><button class="btn primary raised">'+bolt+(rematch?' Start bonus match':' Play challenge')+'</button>'+button('View professor',linkProf(p.id),'subtle')+'</div>'+'</form></div>');
   bindForm($('#daily-battle'),async data=>{
     const b=await api('battle/start',{type:match.type,to:rematch,playlist:data.get('playlist')});
     go('battle?id='+qs(b.id));
@@ -415,7 +399,7 @@ function battlePage(b,version,animate=false){
   const instruction=choiceQuestion?(b.question.kind==='rare'?'Pick the rarest outcome':'Pick the most common outcome'):'Closest estimate wins';
   const choices=choiceQuestion?'<fieldset class="trivia-options"><legend>'+instruction+'</legend>'+b.question.options.map((option,index)=>'<label><input type="radio" name="choice" value="'+index+'" required><span>'+esc(option)+'</span></label>').join('')+'</fieldset>':'';
   const question=!reveal?'<div class="panel battle-question"><div class="battle-meta"><span class="eyebrow">'+roundLabel+' · '+esc(b.question.category)+'</span><span class="clock" id="clock">—</span></div><h2>'+esc(b.question.prompt)+'</h2><form id="guess" class="stack">'+choices+'<div class="actions">'+(choiceQuestion?'':field('Your estimate ('+esc(b.question.unit)+')','estimate','required inputmode="decimal" autocomplete="off" placeholder="Enter a number"'))+'<button class="btn primary raised">Lock in answer</button></div>'+err+'</form></div>':'';
-  page('<div class="battle">'+(ended?head('Battle result',esc(b.player.name)+' vs. '+esc(b.enemy.name)):head('Campus arena',b.playlist&&b.playlist!=='estimate'?'Trivia Battle':'Closest Wins'))+stage+result+answerPanel+question+'<p class="small battle-question">Trivia score '+score+' · '+b.log.length+' completed '+(b.log.length===1?'round':'rounds')+'</p>'+(b.log.length>1?'<details class="panel"><summary>Round history</summary>'+b.log.map((r,i)=>'<div class="review"><strong>Round '+(i+1)+'</strong><p>'+esc(r.prompt)+'</p><small>You '+formatTriviaAnswer(r.estimate)+' · Bot '+formatTriviaAnswer(r.bot)+' · Answer '+formatTriviaAnswer(r.answer)+' · '+r.damage+' damage</small></div>').join('')+'</details>':'')+'</div>');
+  page('<div class="battle">'+(ended?head('Battle result',esc(b.player.name)+' vs. '+esc(b.enemy.name)):head('',b.playlist&&b.playlist!=='estimate'?'Trivia Battle':'Closest Wins'))+stage+result+answerPanel+question+'<p class="small battle-question">Trivia score '+score+' · '+b.log.length+' completed '+(b.log.length===1?'round':'rounds')+'</p>'+(b.log.length>1?'<details class="panel"><summary>Round history</summary>'+b.log.map((r,i)=>'<div class="review"><strong>Round '+(i+1)+'</strong><p>'+esc(r.prompt)+'</p><small>You '+formatTriviaAnswer(r.estimate)+' · Bot '+formatTriviaAnswer(r.bot)+' · Answer '+formatTriviaAnswer(r.answer)+' · '+r.damage+' damage</small></div>').join('')+'</details>':'')+'</div>');
   const next=async(action,answer={})=>{
     const updated=await api('battle',{id:b.id,round:b.round,action,...answer});
     if(updated.status==='finished'&&updated.reward)refresh().catch(()=>{});
@@ -565,9 +549,6 @@ function contactPage(){
     page(intro+'<p class="notice" role="status">Message sent to the moderator inbox.</p>');
   });
 }
-function guidelines(){
-  page(head('Campus arcade','Community Guidelines')+'<div class="guidelines panel"><h2>Keep the fight fictional</h2><p>Combat ratings describe imaginary trivia fighters. Keep comments playful and focused on the game.</p><h2>Respect people’s privacy and safety</h2><p>Threats, harassment, discriminatory comments, private personal information, and unverified accusations are prohibited.</p><h2>Report a problem</h2><p>Use Report on a review or Request correction or removal on a professor profile to send a private note to a moderator.</p><h2>Check the source</h2><p>New faculty listings require an official university directory source. Avatar suggestions are reviewed before they appear.</p><h2>About the arcade</h2><p>Fight My Professor is an independent parody and is unaffiliated with universities and rating sites.</p></div>');
-}
 async function route(scroll=true){
   const version=++routeCounter;
   clearInterval(timer);activeDialog?.close();
@@ -592,7 +573,6 @@ async function route(scroll=true){
     else if(section==='contribute')await contribute(version);
     else if(section==='request')requestPage();
     else if(section==='admin')await admin(version);
-    else if(section==='guidelines')guidelines();
     else if(section==='contact')contactPage();
     else if(section==='battle'){const b=await api('battle?id='+qs(id));battlePage(b,version);}
     else if(section==='player'){
@@ -600,7 +580,7 @@ async function route(scroll=true){
       if(!u)throw new Error('Fighter not found.');
       playerProfile(u);
     }else throw new Error('Page not found.');
-  }catch(e){if(version===routeCounter)page(head('Campus arcade','Something went wrong',esc(e.message))+button('Back to homepage','home','primary'));}
+  }catch(e){if(version===routeCounter)page(head('','Something went wrong',esc(e.message))+button('Back to homepage','home','primary'));}
 }
 window.addEventListener('popstate',()=>{migrateBookmark();route();});
 document.addEventListener('click',event=>{
@@ -613,4 +593,4 @@ document.addEventListener('click',event=>{
   route();
 });
 migrateBookmark();
-refresh().then(()=>route()).catch(error=>page(head('Campus arcade','Couldn’t load the site',esc(error.message))));
+refresh().then(()=>route()).catch(error=>page(head('','Couldn’t load the site',esc(error.message))));

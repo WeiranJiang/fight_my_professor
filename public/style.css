@@ -55,3 +55,76 @@
 .trivia-options legend{font-weight:750;margin-bottom:8px}
 .trivia-options label{display:flex;align-items:center;gap:8px;min-height:44px;padding:8px 12px;border:1px solid var(--line);border-radius:8px;cursor:pointer}
 .trivia-options label:has(input:checked){background:#fff0c3;border-color:#977019}
+
+.question-format {
+  width: min(100%, 20rem);
+}
+.question-format select {
+  width: 100%;
+  min-height: 44px;
+  appearance: none;
+  padding-inline-end: 2.5rem;
+  background-image: linear-gradient(45deg, transparent 50%, currentColor 50%),
+    linear-gradient(135deg, currentColor 50%, transparent 50%);
+  background-position: right 1.2rem center, right .9rem center;
+  background-size: .3rem .3rem;
+  background-repeat: no-repeat;
+}
+@media (forced-colors: active) {
+  .question-format select { appearance: auto; }
+}
+
+/* The daily game is the main entry point. Directory and account tools stay in the header. */
+:root {
+  --paper: #f5f4ee;
+  --ink: #1d2934;
+  --line: #d8ddd8;
+  --muted: #50606a;
+  --yellow: #f0cf72;
+}
+.nav {
+  background: var(--paper);
+  color: var(--ink);
+  border-bottom: 1px solid var(--line);
+}
+.nav-inner { min-height: 64px; }
+.nav nav a { color: var(--muted); }
+.nav nav a:hover,
+.nav nav a[aria-current] {
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: .35em;
+}
+.daily-home {
+  width: min(100% - 32px, 660px);
+  margin-inline: auto;
+  padding-block: clamp(36px, 7vw, 78px) 52px;
+  text-align: center;
+}
+.daily-home h1 {
+  font-size: clamp(2.2rem, 7vw, 4.5rem);
+  line-height: 1;
+}
+.daily-kicker {
+  margin: 16px 0 26px;
+  color: var(--muted);
+}
+.daily-preview[aria-busy="true"]:empty { min-height: 220px; }
+.daily-preview .challenge-preview { margin: 0; }
+.daily-school {
+  margin: 12px 0 0;
+  font-size: .86rem;
+  color: var(--muted);
+}
+.daily-entry { margin: 22px auto 0; max-width: 360px; }
+.daily-entry .btn { width: 100%; min-height: 50px; }
+.footer-inner {
+  justify-content: center;
+  padding-block: 16px;
+}
+.auth .page-title { text-align: center; }
+.auth .panel { box-shadow: none; }
+#daily-battle .btn.raised { box-shadow: none; }
+
+/* Route changes move focus to main. Interactive controls retain their focus rings. */
+#app:focus { outline: none; }

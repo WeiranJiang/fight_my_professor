@@ -2,3 +2,11 @@ node_modules/
 data/
 .env
 dist/
+.env.*
+!.env.example
+*.sqlite
+*.sqlite3
+*.sqlite-wal
+*.sqlite-shm
+*.sqlite3-wal
+*.sqlite3-shm
