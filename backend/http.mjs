@@ -1,3 +1,4 @@
+import { challengeDay, dailyProfessor } from './daily-challenge.mjs';
 import { schoolMarkSources } from '../public/school-marks.js';
 import { cookie, digest, fail, requireRule, uid } from './request.mjs';
 import account from './routes/account.mjs';
@@ -17,12 +18,16 @@ export const securityHeaders = {
 };
 const pagePaths=new Set(['/search','/fight','/rankings','/schools','/school','/contribute',
   '/contact','/login','/signup','/recover','/fighter','/fighter/edit','/professor',
-  '/player','/battle','/request','/admin']);
+  '/player','/battle','/request','/admin','/style-guide']);
 export const assets={
   '/':['index.html','text/html'],
   '/app.js':['app.js','text/javascript'],
   '/shared.js':['shared.js','text/javascript'],
+  '/pixelify-sans.ttf':['pixelify-sans.ttf','font/ttf'],
+  '/pixelify-sans-OFL.txt':['pixelify-sans-OFL.txt','text/plain'],
   '/style.css':['style.css','text/css'],
+  '/pixels.svg':['pixels.svg','image/svg+xml'],
+  '/arena-tiles.svg':['arena-tiles.svg','image/svg+xml'],
   '/arena.svg':['arena.svg','image/svg+xml'],
   '/robots.txt':['robots.txt','text/plain'],
   '/school-marks.js':['school-marks.js','text/javascript'],
@@ -71,10 +76,25 @@ export function createHandler({ withStore, readAsset, env={}, legacyPassword }) 
     if(!url.pathname.startsWith('/api/')){
       const asset=pagePaths.has(url.pathname)?assets['/']:Object.hasOwn(assets,url.pathname)?assets[url.pathname]:null;
       if(!asset||!['GET','HEAD'].includes(method))return new Response('Page not found',{status:404,headers});
-      const binary=asset[1].startsWith('image/')&&!asset[1].endsWith('+xml');
+      const binary=asset[1]==='image/png'||asset[1]==='font/ttf';
       headers.set('Content-Type',binary?asset[1]:asset[1]+'; charset=utf-8');
       headers.set('Cache-Control',binary?'public, max-age=3600':'no-cache');
-      return new Response(method==='HEAD'?null:await readAsset(asset[0]),{headers});
+      if(method==='HEAD')return new Response(null,{headers});
+      let content=await readAsset(asset[0]);
+      if(url.pathname==='/'||url.pathname==='/fight'){
+        if(typeof content!=='string')content=new TextDecoder().decode(content);
+        try {
+          const professor=await withStore(false,async storage=>{
+            const people=(await storage.list('professor')).filter(professor=>professor.published!==false);
+            return dailyProfessor(people,challengeDay(Date.now()),storage);
+          });
+          if(professor){
+            const name=professor.name.replace(/[&<>"']/g,char=>'&#'+char.charCodeAt(0)+';');
+            content=content.replace('<!--daily-professor-->','<p class="daily-professor">'+name+'</p>');
+          }
+        }catch(error){console.error(error);}
+      }
+      return new Response(content,{headers});
     }
     headers.set('Cache-Control','no-store');
     const handle=routes[method+' '+url.pathname];

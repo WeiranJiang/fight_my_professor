@@ -8,8 +8,9 @@ const qs=s=>encodeURIComponent(s);
 const pick=(a,b)=>a===b?'selected':'';
 const fmt=n=>n===null?'Timed out':Number(n).toLocaleString('en-US',{maximumFractionDigits:2});
 const date=s=>new Date(s).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
-const sprite=(a,classes='')=>'<img class="sprite '+classes+'" src="'+avatar(a)+'" alt="" aria-hidden="true">';
-const bolt='<span aria-hidden="true">⚡</span>';
+const sprite=(a,classes='',rear=false)=>'<img class="sprite '+classes+'" src="'+avatar(a,rear)+'" alt="" aria-hidden="true">';
+const pixelIcon=name=>'<svg class="pixel-icon" width="16" height="16" aria-hidden="true"><use href="/pixels.svg#'+name+'"/></svg>';
+const pencil=pixelIcon('pencil');
 const empty=(message)=>'<div class="empty">'+message+'</div>';
 let state={people:[],schools:[],me:null}, timer, toastTimer, routeCounter=0, returnTo='', activeDialog;
 const current=()=>location.pathname==='/fighter/edit'?'fighter':location.pathname.slice(1)||'home';
@@ -84,22 +85,37 @@ function nav(){
     if(node.pathname==='/'+section||(section==='professor'&&node.pathname==='/search')||(section==='battle'&&node.pathname==='/fight')||(section==='school'&&node.pathname==='/schools'))node.setAttribute('aria-current','page'); else node.removeAttribute('aria-current');
   });
 }
+const siteMenu=$('#site-menu');
+$('#open-menu').onclick=()=>siteMenu.showModal();
+siteMenu.addEventListener('click',event=>{if(event.target===siteMenu)siteMenu.close();});
+siteMenu.querySelector('form').addEventListener('submit',event=>{event.preventDefault();siteMenu.close();});
+const themeToggle=$('#theme-toggle');
+function setTheme(whiteboard){
+  document.documentElement.dataset.theme=whiteboard?'whiteboard':'navy';
+  themeToggle.setAttribute('aria-pressed',String(whiteboard));
+  $('meta[name="theme-color"]').content=whiteboard?'#F5F4EE':'#0B1120';
+}
+try{setTheme(localStorage.getItem('fmp-palette')==='whiteboard');}catch{setTheme(false);}
+themeToggle.onclick=()=>{
+  const whiteboard=document.documentElement.dataset.theme!=='whiteboard';
+  setTheme(whiteboard);
+  try{localStorage.setItem('fmp-palette',whiteboard?'whiteboard':'navy');}catch{}
+};
 function page(content,classes=''){app.innerHTML='<div class="wrap page '+classes+'">'+content+'</div>';}
 const bars=p=>'<div class="bars">'+stats.map((label,i)=>'<div class="bar-row"><span>'+label+'</span><div class="meter" aria-hidden="true"><i style="width:'+p.values[i]+'%"></i></div><strong>'+p.values[i]+'</strong></div>').join('')+'</div>';
 function schoolMark(s){
-  if(!Object.hasOwn(schoolMarkSources,s.id))return '<span class="school-icon" aria-hidden="true">▦</span>';
+  if(!Object.hasOwn(schoolMarkSources,s.id))return '<span class="school-icon" aria-hidden="true">'+pixelIcon('schools')+'</span>';
   return '<span class="school-icon school-mark"><img src="/school-marks/'+s.id+'.png" alt="" width="48" height="48" loading="lazy"></span>';
 }
 const schoolCard=s=>'<a class="school-card" href="/'+linkSchool(s.id)+'">'+schoolMark(s)+'<h3>'+esc(s.name)+'</h3><small>'+esc(s.location)+' · '+(s.count?s.count+' '+(s.count===1?'faculty profile':'faculty profiles'):'Faculty roster pending')+'</small></a>';
 function home(){
   app.innerHTML='<section class="daily-home"><header><h1>Fight My Professor</h1><p class="daily-kicker pixel">Daily Challenge – Professor of the Day</p></header>'+
     '<div id="daily-preview" class="daily-preview" aria-busy="true"></div>'+
-    '<div class="daily-entry">'+button('Play challenge','fight','primary')+'</div></section>';
+    '<div class="daily-entry">'+button('Start round','fight','primary')+'</div></section>';
   const preview=$('#daily-preview');
   api('challenge').then(({professor:p})=>{
     if(!preview.isConnected)return;
-    const player={name:state.me?.name??'Campus Challenger',avatar:state.me?.avatar??defaultAvatar,level:state.me?.level??1};
-    preview.innerHTML='<div class="battle-stage challenge-preview">'+combatant(player,100,100,'',true)+'<span class="pixel">VS</span>'+combatant(p,100,100,'',true)+'</div>'+
+    preview.innerHTML=professorPreview(p)+'<p class="daily-professor">'+esc(p.name)+'</p>'+
       '<p class="daily-school">'+schoolName(p.school)+'</p>';
   }).catch(()=>{}).finally(()=>preview.removeAttribute('aria-busy'));
 }
@@ -182,7 +198,7 @@ function schoolPage(){
 function modal(title,content){
   activeDialog?.close();
   const el=document.createElement('dialog');el.className='modal';
-  el.innerHTML='<div class="modal-header"><h3>'+title+'</h3><button type="button" aria-label="Close">×</button></div>'+content;
+  el.innerHTML='<div class="modal-header"><h3>'+title+'</h3><button type="button" aria-label="Close">'+pixelIcon('close')+'</button></div>'+content;
   $('.modal-header button',el).onclick=()=>el.close();
   el.addEventListener('close',()=>{el.remove();if(activeDialog===el)activeDialog=null;});
   document.body.append(el);activeDialog=el;el.showModal();return el;
@@ -233,7 +249,7 @@ async function professor(id,version){
   if(version!==routeCounter)return;
   const mine=reviews.find(r=>r.mine);
   page('<div class="profile-head">'+score(p.demo||p.count?p.power:'—',p.demo||p.count?'GAME POWER':'UNRATED')+'<div><span class="eyebrow">'+(p.demo?'Fictional demo professor':'Professor profile')+'</span><h1>'+esc(p.name)+'</h1><p class="muted">'+esc(p.department)+' · <a class="text-link" href="/'+linkSchool(p.school)+'">'+schoolName(p.school)+'</a></p>'+(p.academicTitle?'<p class="faculty-title">'+esc(p.academicTitle)+'</p>':'')+'<span class="pill">'+p.difficulty+'</span> <small>'+p.count+' ratings'+(p.rank?' · #'+p.schoolRank+' at '+esc(school(p.school)?.short)+' · #'+p.rank+' globally':'')+'</small></div><div class="card-stage tone-'+esc(p.tone)+'">'+sprite(p.avatar)+'</div></div>'+
-    '<div class="actions">'+(canRematch?button(bolt+' Play bonus match','fight?rematch='+qs(p.id),'primary raised'):'')+'<button class="btn '+(canRematch?'':'primary raised')+'" id="rate">'+(mine?'Edit your rating':'Rate professor')+'</button><button class="btn subtle" id="compare">Compare</button><button class="btn subtle" id="favorite">'+(state.me?.favorites.includes(p.id)?'★ Saved':'☆ Save')+'</button></div>'+
+    '<div class="actions">'+(canRematch?button(pencil+' Play bonus match','fight?rematch='+qs(p.id),'primary raised'):'')+'<button class="btn '+(canRematch?'':'primary raised')+'" id="rate">'+(mine?'Edit your rating':'Rate professor')+'</button><button class="btn subtle" id="compare">Compare</button><button class="btn subtle" id="favorite">'+(state.me?.favorites.includes(p.id)?'Saved':'Save')+'</button></div>'+
     '<div class="section grid two"><div class="panel stack"><h2>Game stats</h2>'+bars(p)+'<small>'+(p.demo?'Demo battle stats.':p.count?'Community game ratings use a baseline and require '+state.settings.minRatings+' reviews for official ranks.':'This fighter uses neutral starting stats until the community adds ratings.')+'</small></div><div class="panel stack"><h2>'+(p.demo?'Training fighter':'Academic profile')+'</h2>'+(p.demo?'<p>'+esc(p.title)+' · '+fought+' completed '+(fought===1?'battle':'battles')+'</p>':(p.research?.length?'<div><h3>Research areas</h3><ul class="research-list">'+p.research.map(topic=>'<li>'+esc(topic)+'</li>').join('')+'</ul></div>':'<p>'+esc(p.department)+'</p>'))+(p.source?'<a class="text-link small" href="'+esc(p.source)+'" target="_blank" rel="noopener">Official faculty source</a>':'')+'<details><summary>Profile feedback</summary><div class="actions directory-footer"><button class="btn subtle" id="avatar-edit">Suggest avatar edit</button><button class="btn subtle" id="correction">Request correction or removal</button></div></details></div></div>'+
     '<div class="panel"><h2>Student reviews</h2>'+(reviews.map(r=>'<article class="review"><div class="split"><strong>'+((r.values.reduce((x,y)=>x+y,0)/6).toFixed(1))+' / 5</strong><small>'+date(r.date)+(r.course?' · '+esc(r.course):'')+'</small></div><small>'+stats.map((s,i)=>s+' '+r.values[i]).join(' · ')+'</small><p>'+esc(r.comment)+'</p><div class="actions">'+r.tags.map(t=>'<span class="pill">'+esc(t)+'</span>').join('')+'</div><div class="actions">'+(r.mine?'<button class="btn subtle danger" id="remove-review">Delete your rating</button>':'<button class="btn subtle" data-help="'+esc(r.id)+'" aria-pressed="'+r.voted+'">Helpful ('+r.helpful+')</button><button class="btn subtle" data-report="'+esc(r.id)+'">Report</button>')+'</div></article>').join('')||empty('No student ratings yet.'))+'</div>');
   $('#rate').onclick=()=>state.me?rating(p,mine):noAuth();
@@ -328,9 +344,9 @@ const fighterTitle=n=>n>=50?'Dean’s Nightmare':n>=30?'Tenure Threat':n>=20?'Pr
 function playerProfile(user,isMe=false){
   const total=user.wins+user.losses+(user.draws??0), power=Math.round(user.values.reduce((a,b)=>a+b,0)/6), xp=user.xp%state.settings.levelXP;
   page('<div class="profile-head">'+score(power)+'<div><span class="eyebrow">'+fighterTitle(user.level)+'</span><h1>'+esc(user.name)+'</h1><p class="muted">Level '+user.level+' · '+(user.school?schoolName(user.school):'Independent fighter')+'</p></div><div class="card-stage tone-violet">'+sprite(user.avatar)+'</div></div>'+
-    (isMe?'<div class="actions">'+button(bolt+' Daily challenge','fight','primary raised')+button('Customize fighter','fighter?edit=1')+'<button class="btn subtle" id="recovery-key">Recovery key</button><button class="btn subtle" id="logout">Log out</button></div>':'')+
+    (isMe?'<div class="actions">'+button(pencil+' Daily challenge','fight','primary raised')+button('Customize fighter','fighter?edit=1')+'<button class="btn subtle" id="recovery-key">Recovery key</button><button class="btn subtle" id="logout">Log out</button></div>':'')+
     '<div class="section grid two"><div class="panel stack"><h2>Combat stats</h2>'+bars(user)+'</div><div class="panel stack"><h2>Progression</h2><div><strong>'+user.xp+' XP</strong><div class="meter" aria-hidden="true"><i style="width:'+(xp/state.settings.levelXP*100)+'%"></i></div><small>'+xp+' / '+state.settings.levelXP+' XP to next level</small></div><div>'+total+' battles · '+user.wins+' wins · '+user.losses+' losses'+(user.draws?' · '+user.draws+' draws':'')+'</div><div>'+(total?Math.round(user.wins/total*100):0)+'% win rate · '+user.defeated.length+' unique opponents defeated</div><div>Best trivia score '+user.best+'</div></div></div>'+
-    (isMe?'<div class="grid two"><div class="panel stack"><h2>Achievements</h2><div class="actions">'+(user.achievements.map(a=>'<span class="pill">'+esc(a)+'</span>').join('')||'<small>Play your first battle to start earning badges.</small>')+'</div><h3>Saved professors</h3><div class="mini-list">'+(user.favorites.map(id=>prof(id)).filter(Boolean).map(p=>'<a href="/'+linkProf(p.id)+'">★ <strong>'+esc(p.name)+'</strong>'+score(p.power)+'</a>').join('')||'<small>Save professors from their profiles.</small>')+'</div></div><div class="panel stack"><h2>Battle history</h2><div class="mini-list">'+(user.history.map(b=>'<a href="/battle?id='+qs(b.id)+'"><span>'+({player:'✓',enemy:'×',tie:'='})[b.result]+'</span><strong>'+esc(b.name)+'<br><small>'+({player:'Win',enemy:'Loss',tie:'Draw'})[b.result]+' · +'+b.xp+' XP'+(b.score!=null?' · '+b.score+' trivia points':'')+'</small></strong><small>'+date(b.date)+'</small></a>').join('')||'<small>Your completed challenges will appear here.</small>')+'</div></div></div>':''));
+    (isMe?'<div class="grid two"><div class="panel stack"><h2>Achievements</h2><div class="actions">'+(user.achievements.map(a=>'<span class="pill">'+esc(a)+'</span>').join('')||'<small>Play your first battle to start earning badges.</small>')+'</div><h3>Saved professors</h3><div class="mini-list">'+(user.favorites.map(id=>prof(id)).filter(Boolean).map(p=>'<a href="/'+linkProf(p.id)+'">★ <strong>'+esc(p.name)+'</strong>'+score(p.power)+'</a>').join('')||'<small>Save professors from their profiles.</small>')+'</div></div><div class="panel stack"><h2>Battle history</h2><div class="mini-list">'+(user.history.map(b=>'<a href="/battle?id='+qs(b.id)+'"><span>'+({player:'win',enemy:'loss',tie:'='})[b.result]+'</span><strong>'+esc(b.name)+'<br><small>'+({player:'Win',enemy:'Loss',tie:'Draw'})[b.result]+' · +'+b.xp+' XP'+(b.score!=null?' · '+b.score+' trivia points':'')+'</small></strong><small>'+date(b.date)+'</small></a>').join('')||'<small>Your completed challenges will appear here.</small>')+'</div></div></div>':''));
   if(isMe)$('#recovery-key').onclick=()=>{
     const dialog=modal('Generate a recovery key','<form class="stack">'+field('Current password','password','type="password" required autocomplete="current-password"')+err+'<button class="btn primary">Generate key</button></form>');
     bindForm($('form',dialog),async data=>{
@@ -360,25 +376,29 @@ async function arena(version){
   if(version!==routeCounter)return;
   const {professor:p}=match;
   const title=rematch?'Bonus match':'Daily Challenge – Professor of the Day';
-  const opponent='<div class="battle-stage challenge-preview">'+combatant({name:state.me?.name??'Campus Challenger',avatar:state.me?.avatar??defaultAvatar,level:state.me?.level??1},100,100,'',true)+'<span class="pixel">VS</span>'+combatant(p,100,100,'',true)+'</div>';
+  const opponent=professorPreview(p);
   const links='<div class="actions">'+button('View professor',linkProf(p.id),'subtle')+(state.me?button('Customize your fighter','fighter?edit=1','subtle'):'<a class="btn subtle" href="/signup">Create a fighter</a>')+'</div>';
   const intro=head('',title);
   if(match.battleId){
-    page('<div class="battle">'+intro+opponent+'<div class="panel battle-question stack"><h2>'+esc(p.name)+'</h2><p>'+(match.status==='finished'?'You finished this challenge.':'Your match is already underway.')+'</p><div class="actions">'+button(match.status==='finished'?'View result':'Continue match','battle?id='+qs(match.battleId),'primary raised')+'</div>'+links+'</div></div>');
+    page('<div class="battle arena-preview">'+intro+opponent+'<div class="panel battle-question stack"><h2>'+esc(p.name)+'</h2><p>'+(match.status==='finished'?'You finished this challenge.':'Your match is already underway.')+'</p><div class="actions">'+button(match.status==='finished'?'View result':'Continue match','battle?id='+qs(match.battleId),'primary raised')+'</div>'+links+'</div></div>');
     return;
   }
   if(!match.available){
-    page('<div class="battle">'+intro+opponent+'<div class="panel battle-question stack"><h2>'+esc(p.name)+'</h2><p>Submit your first rating for this professor to unlock a bonus match.</p>'+links+'</div></div>');
+    page('<div class="battle arena-preview">'+intro+opponent+'<div class="panel battle-question stack"><h2>'+esc(p.name)+'</h2><p>Submit your first rating for this professor to unlock a bonus match.</p>'+links+'</div></div>');
     return;
   }
-  page('<div class="battle">'+intro+opponent+'<form id="daily-battle" class="panel battle-question stack"><div><h2>'+esc(p.name)+'</h2><p class="small">'+schoolName(p.school)+' · '+esc(p.department)+'</p></div><label class="field question-format">Question format<select name="playlist"><option value="mixed">Mixed trivia</option><option value="estimate">Estimation</option><option value="rare">Rarest answer</option><option value="common">Most common answer</option></select></label>'+err+'<div class="actions"><button class="btn primary raised">'+bolt+(rematch?' Start bonus match':' Play challenge')+'</button>'+button('View professor',linkProf(p.id),'subtle')+'</div>'+'</form></div>');
+  page('<div class="battle arena-preview">'+intro+opponent+'<form id="daily-battle" class="panel battle-question stack"><div><h2>'+esc(p.name)+'</h2><p class="small">'+schoolName(p.school)+' · '+esc(p.department)+'</p></div><label class="field question-format">Question format<select name="playlist"><option value="mixed">Mixed trivia</option><option value="estimate">Estimation</option><option value="rare">Rarest answer</option><option value="common">Most common answer</option></select></label>'+err+'<div class="actions"><button class="btn primary raised">'+pencil+(rematch?' Start bonus round':' Start round')+'</button>'+button('View professor',linkProf(p.id),'subtle')+'</div>'+'</form></div>');
   bindForm($('#daily-battle'),async data=>{
     const b=await api('battle/start',{type:match.type,to:rematch,playlist:data.get('playlist')});
     go('battle?id='+qs(b.id));
   });
 }
-function combatant(f,hp,max,animation,preview=false){
-  return '<div class="fighter-battle '+animation+'"><strong>'+esc(f.name)+(f.demo?' (demo)':'')+'</strong>'+(preview?'':'<div class="health"><i style="width:'+(100*hp/max)+'%"></i></div><small>'+hp+' / '+max+' HP · '+(f.level?'Lv. '+f.level:f.power+' power')+'</small>')+sprite(f.avatar)+'</div>';
+function professorPreview(professor){
+  return '<div class="battle-stage challenge-preview">'+sprite(professor.avatar)+'</div>';
+}
+function combatant(f,hp,max,animation,rear=false,answer){
+  const speech=answer===undefined?'':'<p class="answer-bubble" aria-label="'+(rear?'Your':'Professor’s')+' response: '+(answer==null?'No answer':esc(answer))+'">'+(answer==null?'…':formatTriviaAnswer(answer))+'</p>';
+  return '<div class="fighter-battle '+animation+'"><strong>'+esc(f.name)+(f.demo?' (demo)':'')+'</strong><div class="health"><i style="width:'+(100*hp/max)+'%"></i></div><small><span class="hp-count">'+hp+' / '+max+' HP</span><span>'+(f.level?'Lv. '+f.level:f.power+' power')+'</span></small>'+speech+sprite(f.avatar,rear?'rear-sprite':'',rear)+'</div>';
 }
 const formatTriviaAnswer=answer=>typeof answer==='string'?esc(answer):fmt(answer);
 function battlePage(b,version,animate=false){
@@ -386,20 +406,33 @@ function battlePage(b,version,animate=false){
   clearInterval(timer);
   const last=b.log.at(-1), ended=b.status==='finished', reveal=b.status==='reveal'||ended;
   const attack=who=>!animate||last?.winner==='tie'?'':last?.winner===who?'lunge':'flash';
-  const stage='<div class="battle-stage">'+combatant(b.player,b.playerHP,b.maxPlayer,attack('player'))+'<span class="pixel">VS</span>'+combatant(b.enemy,b.enemyHP,b.maxEnemy,attack('enemy'))+(animate&&last?.damage?'<span aria-hidden="true" class="damage '+(last.winner==='player'?'right':'left')+'">−'+last.damage+'</span>':'')+'</div>';
-  const score=b.log.reduce((n,r)=>n+r.score,0);
+  const stage='<div class="battle-stage active-stage">'+combatant(b.player,b.playerHP,b.maxPlayer,attack('player'),true,reveal&&last?last.estimate:undefined)+'<span class="pixel">VS</span>'+combatant(b.enemy,b.enemyHP,b.maxEnemy,attack('enemy'),false,reveal&&last?last.bot:undefined)+(animate&&last?.damage?'<span aria-hidden="true" class="damage '+(last.winner==='player'?'right':'left')+'">−'+last.damage+'</span>':'')+'</div>';
   const roundLabel='Round '+(b.round+1)+' of '+b.total;
-  const result=ended?'<div class="panel battle-question stack"><h2>'+(b.winner==='player'?'Victory!':b.winner==='enemy'?'Defeat!':'Draw!')+'</h2><p>'+(b.winner==='tie'?'Both fighters finished with the same share of HP.':esc(b[b.winner].name)+' takes the match.')+'</p><div class="actions"><span class="pill">'+score+' trivia points</span><span class="pill">'+b.log.filter(r=>r.playerError===0).length+' perfect answers</span><span class="pill">'+b.log.filter(r=>r.winner==='player').reduce((sum,r)=>sum+r.damage,0)+' damage dealt</span><span class="pill">'+b.log.filter(r=>r.winner==='enemy').length+' bot rounds won</span>'+(b.reward?'<span class="pill">+'+b.reward.xp+' XP</span>':'')+'</div>'+
-    (b.reward?.leveled?'<div class="notice"><strong>LEVEL UP!</strong> You reached level '+b.reward.level+' and earned new stat points.</div>':'')+
-    (b.reward?.achievements.length?'<div class="notice">Unlocked '+esc(b.reward.achievements.join(', '))+'</div>':'')+
-    '<div class="actions">'+(b.challengeType!=='rematch'&&!b.enemy.demo?button('Rate professor for a bonus match',linkProf(b.enemy.id),'primary'):'')+button('Daily challenge','fight','subtle')+'<button class="btn subtle" id="share">Share result</button>'+button('View rankings','rankings','subtle')+'</div><div id="share-field"></div>'+
-    (b.progression?(state.me?button('Customize your fighter','fighter?edit=1','subtle'):''):'<small>Create an account to build your own fighter and start leveling up. <a class="text-link" href="/signup">Sign up</a></small>')+'</div>':'';
-  const answerPanel=reveal&&last?'<div class="panel battle-question"><div class="battle-meta"><span class="eyebrow">'+roundLabel+'</span><span class="pill">'+(last.winner==='player'?'You land the hit':last.winner==='enemy'?'The professor lands the hit':'Tie · no damage')+'</span></div><h2>'+esc(last.prompt)+'</h2><div class="grid guess-grid"><div><small>Your answer</small><strong>'+formatTriviaAnswer(last.estimate)+'</strong></div><div><small>Bot answer</small><strong>'+formatTriviaAnswer(last.bot)+'</strong></div><div><small>Answer</small><strong>'+formatTriviaAnswer(last.answer)+'</strong></div></div><p class="small">'+last.damage+' damage · '+last.score+' trivia points'+(last.source?' · <a class="text-link" href="'+esc(last.source)+'" target="_blank" rel="noopener">Answer source</a>':'')+'</p><div class="actions">'+(!ended?'<button class="btn primary raised" id="next">Next round</button>':'')+'<button class="btn subtle" id="question-report">Report question</button></div></div>':'';
+  const roundTrack='<div class="round-track" aria-label="'+roundLabel+'">'+
+    '<div class="round-cells" aria-hidden="true">'+Array.from({length:b.total},(_,index)=>
+      '<span class="'+(index<b.log.length?'done':index===b.round?'current':'')+'"></span>'
+    ).join('')+'</div><span>'+roundLabel+'</span></div>';
+  const result=ended?'<section class="panel battle-question match-result stack"><h2 class="result-'+b.winner+'">'+
+    (b.winner==='player'?'You passed.':b.winner==='enemy'?'See me after class.':'Draw.')+'</h2>'+
+    (b.reward?'<p class="small">+'+b.reward.xp+' XP'+(b.reward.leveled?' · Level '+b.reward.level:'')+'</p>':'')+
+    '<div class="actions">'+(b.challengeType!=='rematch'&&!b.enemy.demo?button('Rate for a bonus match',linkProf(b.enemy.id),'subtle'):'')+
+    button('Daily challenge','fight','primary')+'<button class="btn subtle" id="share">Share result</button></div><div id="share-field"></div></section>':'';
+  const answerPanel=reveal&&!ended&&last?'<div class="panel battle-question stack"><h2>'+esc(last.prompt)+'</h2><div class="actions">'+
+    (!ended?'<button class="btn primary" id="next">Start next round</button>':'')+
+    '<button class="btn subtle" id="question-report">Report question</button>'+
+    (last.source?' <a class="text-link small" href="'+esc(last.source)+'" target="_blank" rel="noopener">Answer source</a>':'')+
+    '</div></div>':'';
   const choiceQuestion=b.question?.kind==='rare'||b.question?.kind==='common';
   const instruction=choiceQuestion?(b.question.kind==='rare'?'Pick the rarest outcome':'Pick the most common outcome'):'Closest estimate wins';
-  const choices=choiceQuestion?'<fieldset class="trivia-options"><legend>'+instruction+'</legend>'+b.question.options.map((option,index)=>'<label><input type="radio" name="choice" value="'+index+'" required><span>'+esc(option)+'</span></label>').join('')+'</fieldset>':'';
-  const question=!reveal?'<div class="panel battle-question"><div class="battle-meta"><span class="eyebrow">'+roundLabel+' · '+esc(b.question.category)+'</span><span class="clock" id="clock">—</span></div><h2>'+esc(b.question.prompt)+'</h2><form id="guess" class="stack">'+choices+'<div class="actions">'+(choiceQuestion?'':field('Your estimate ('+esc(b.question.unit)+')','estimate','required inputmode="decimal" autocomplete="off" placeholder="Enter a number"'))+'<button class="btn primary raised">Lock in answer</button></div>'+err+'</form></div>':'';
-  page('<div class="battle">'+(ended?head('Battle result',esc(b.player.name)+' vs. '+esc(b.enemy.name)):head('',b.playlist&&b.playlist!=='estimate'?'Trivia Battle':'Closest Wins'))+stage+result+answerPanel+question+'<p class="small battle-question">Trivia score '+score+' · '+b.log.length+' completed '+(b.log.length===1?'round':'rounds')+'</p>'+(b.log.length>1?'<details class="panel"><summary>Round history</summary>'+b.log.map((r,i)=>'<div class="review"><strong>Round '+(i+1)+'</strong><p>'+esc(r.prompt)+'</p><small>You '+formatTriviaAnswer(r.estimate)+' · Bot '+formatTriviaAnswer(r.bot)+' · Answer '+formatTriviaAnswer(r.answer)+' · '+r.damage+' damage</small></div>').join('')+'</details>':'')+'</div>');
+  const choices=choiceQuestion?'<fieldset class="trivia-options"><legend>'+instruction+'</legend>'+b.question.options.map((option,index)=>'<label><input type="radio" name="choice" value="'+index+'" required><span><b aria-hidden="true">'+(index+1)+'</b> '+esc(option)+'</span></label>').join('')+'</fieldset>':'';
+  const question=!reveal?'<div class="panel battle-question live-question"><div class="battle-meta"><span class="eyebrow">'+esc(b.question.category)+'</span><span class="clock" id="clock" aria-hidden="true"></span></div><h2>'+esc(b.question.prompt)+'</h2><form id="guess" class="stack" tabindex="0" aria-label="Trivia answer">'+choices+'<div class="actions">'+(choiceQuestion?'':field('Your estimate ('+esc(b.question.unit)+')','estimate','required inputmode="decimal" autocomplete="off" placeholder="Enter a number"'))+'<button class="btn primary raised">Turn it in</button></div><div class="round-timer" id="round-timer" role="progressbar" aria-label="Seconds remaining" aria-valuemin="0" aria-valuemax="'+b.question.time+'"><i></i></div>'+err+'</form></div>':'';
+  page('<div class="battle live-battle"><div class="time-warning" aria-hidden="true"></div>'+(ended?head('Battle result',esc(b.player.name)+' vs. '+esc(b.enemy.name)):'<h1 class="visually-hidden">Campus Arena</h1>'+roundTrack)+stage+result+answerPanel+question+'</div>');
+  const choiceForm=$('#guess');
+  if(choiceQuestion&&choiceForm)choiceForm.addEventListener('keydown',event=>{
+    if(!/^[1-4]$/.test(event.key)||event.altKey||event.ctrlKey||event.metaKey)return;
+    const choice=choiceForm.elements.choice[Number(event.key)-1];
+    if(choice){event.preventDefault();choice.checked=true;choice.focus();}
+  });
   const next=async(action,answer={})=>{
     const updated=await api('battle',{id:b.id,round:b.round,action,...answer});
     if(updated.status==='finished'&&updated.reward)refresh().catch(()=>{});
@@ -413,15 +446,27 @@ function battlePage(b,version,animate=false){
     $('#share-field').innerHTML=field('Result link','share','readonly value="'+esc(url)+'"');$('[name=share]').select();
   };
   if($('#guess')){
-    const form=$('#guess'), clock=$('#clock'), end=performance.now()+b.remaining;
+    const form=$('#guess'), clock=$('#clock'), track=$('#round-timer');
+    const warning=$('.time-warning');
+    const duration=b.question.time*1000, end=performance.now()+b.remaining;
     let busy=false;
     const tick=async()=>{
-      const left=Math.max(0,Math.ceil((end-performance.now())/1000));clock.textContent=left+'s';
+      const remaining=Math.max(0,end-performance.now());
+      const left=Math.ceil(remaining/1000);
+      const label=left+'s';
+      if(clock.textContent!==label){
+        clock.textContent=label;
+        track.setAttribute('aria-valuenow',String(left));
+      }
+      track.style.setProperty('--time-left',String(Math.min(1,remaining/duration)));
+      const low=remaining<=duration*.25;
+      track.classList.toggle('urgent',low);
+      warning.style.setProperty('--warning-strength',low?String(.65-.45*remaining/(duration*.25)):'0');
       if(left||busy||version!==routeCounter)return;
       busy=true;
       try{await next('guess');}catch(e){if(version===routeCounter){$('.error',form).textContent=e.message;}busy=false;}
     };
-    timer=setInterval(tick,250);tick();
+    timer=setInterval(tick,100);tick();
     bindForm(form,async data=>{
       if(busy||version!==routeCounter)return;
       let answer;
@@ -549,8 +594,19 @@ function contactPage(){
     page(intro+'<p class="notice" role="status">Message sent to the moderator inbox.</p>');
   });
 }
+function styleGuide(){
+  const tokens=['board','board-raised','board-line','chalk','chalk-dim','brand','grade-a','grade-b','grade-f','hp-player','hp-prof','gold','redpen'];
+  const swatches=tokens.map(token=>'<li><span style="background:var(--'+token+')"></span><code>--'+token+'</code></li>').join('');
+  const icons=['owl','pencil','menu','search','arena','rankings','schools','contact','close'];
+  const sprites=icons.map(name=>'<li><code>'+name+'</code><div>'+[1,2,4].map(scale=>'<span style="--pixel-size:'+(scale*16)+'px">'+pixelIcon(name)+'</span>').join('')+'</div></li>').join('');
+  page(head('','Style guide')+'<div class="stack guide"><section class="panel stack"><h2>Site palette</h2><ul class="guide-grid">'+swatches+'</ul></section>'+
+    '<section class="panel stack"><h2>Type and controls</h2><p>Body text for questions and directions.</p><p class="clock">00:20 · 80 / 100 HP · −18</p><div class="health" aria-label="Example health bar" role="img"><i style="width:80%"></i></div><div class="actions"><button class="btn primary" type="button">Take your seat</button><button class="btn subtle" type="button">View professor</button></div></section>'+
+    '<section class="panel stack"><h2>Pixel icons</h2><ul class="guide-grid guide-icons">'+sprites+'</ul></section>'+
+    '<section class="panel stack"><h2>Fighter portraits</h2><div class="actions">'+sprite(defaultAvatar)+sprite(defaultAvatar,'rear-sprite',true)+'</div></section></div>');
+}
 async function route(scroll=true){
   const version=++routeCounter;
+  if(siteMenu.open)siteMenu.close();
   clearInterval(timer);activeDialog?.close();
   if(scroll){window.scrollTo(0,0);app.focus({preventScroll:true});}
   try{
@@ -574,6 +630,7 @@ async function route(scroll=true){
     else if(section==='request')requestPage();
     else if(section==='admin')await admin(version);
     else if(section==='contact')contactPage();
+    else if(section==='style-guide')styleGuide();
     else if(section==='battle'){const b=await api('battle?id='+qs(id));battlePage(b,version);}
     else if(section==='player'){
       const u=(await api('players')).find(p=>p.id===id);if(version!==routeCounter)return;

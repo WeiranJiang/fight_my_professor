@@ -3,20 +3,25 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="theme-color" content="#f5f4ee">
+<meta name="theme-color" content="#0B1120">
 <meta name="description" content="Challenge the professor of the day to trivia.">
+<meta property="og:title" content="Fight My Professor">
+<meta property="og:description" content="A daily trivia fight against the professor of the day.">
 <title>Fight My Professor</title>
 <link rel="stylesheet" href="/style.css">
 <script type="module" src="/app.js"></script>
 </head>
 <body>
 <header class="nav"><div class="wrap nav-inner">
-<a href="/" class="brand" aria-label="Fight My Professor home"><span class="brand-icon">⚡</span><span>FIGHT MY<br>PROFESSOR<span class="brand-period">.</span></span></a>
-<nav aria-label="Main navigation"><a href="/search">Search</a><a href="/fight">Campus Arena</a><a href="/rankings">Rankings</a><a href="/schools">Schools</a></nav>
-<div id="account"></div>
+<a href="/" class="brand" aria-label="Fight My Professor home"><svg class="pixel-icon" width="16" height="16" aria-hidden="true"><use href="/pixels.svg#owl"/></svg><span>FIGHT MY PROFESSOR<span class="brand-period">.</span></span></a>
+<button id="open-menu" type="button" class="btn menu-button" aria-label="Open menu" aria-controls="site-menu" aria-haspopup="dialog"><svg class="pixel-icon" width="16" height="16" aria-hidden="true"><use href="/pixels.svg#menu"/></svg></button>
+<dialog id="site-menu" class="site-menu" aria-label="Site menu">
+<div class="menu-top"><button id="theme-toggle" type="button" class="btn subtle" aria-pressed="false">whiteboard mode</button><form method="dialog"><button type="submit" class="btn menu-button" aria-label="Close menu"><svg class="pixel-icon" width="16" height="16" aria-hidden="true"><use href="/pixels.svg#close"/></svg></button></form></div>
+<nav aria-label="Main navigation"><a href="/search"><svg class="pixel-icon" width="16" height="16" aria-hidden="true"><use href="/pixels.svg#search"/></svg>search</a><a href="/fight"><svg class="pixel-icon" width="16" height="16" aria-hidden="true"><use href="/pixels.svg#arena"/></svg>campus arena</a><a href="/rankings"><svg class="pixel-icon" width="16" height="16" aria-hidden="true"><use href="/pixels.svg#rankings"/></svg>rankings</a><a href="/schools"><svg class="pixel-icon" width="16" height="16" aria-hidden="true"><use href="/pixels.svg#schools"/></svg>schools</a><a href="/contact"><svg class="pixel-icon" width="16" height="16" aria-hidden="true"><use href="/pixels.svg#contact"/></svg>contact</a></nav>
+<div id="account"><div class="account-actions"><a href="/login">log in</a><a href="/signup" class="btn primary">sign up</a></div></div>
+</dialog>
 </div></header>
-<main id="app" tabindex="-1"><div class="wrap loading">Loading…</div></main>
-<footer><div class="wrap footer-inner"><a href="/contact">Contact</a></div></footer>
+<main id="app" tabindex="-1"><section class="daily-home"><h1>Fight My Professor</h1><p class="daily-kicker">daily challenge – professor of the day</p><!--daily-professor--><div class="daily-entry"><a class="btn primary" href="/fight">start round</a></div></section></main>
 <div id="toast" role="status" aria-live="polite"></div>
 </body>
 </html>

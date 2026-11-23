@@ -35,7 +35,7 @@ export function seededAvatar(id) {
     return [key, (seed >>> 8) % values.length];
   }));
 }
-export function avatar(a = defaultAvatar) {
+export function avatar(a = defaultAvatar, rear = false) {
   const {eyeShape,eyeSize,eyeColor} = {...eyeTraits,...a};
   const widerEyes = eyeShape!==0 || eyeSize!==0;
   const ink = '#282335', skin = options.skin[a.skin], hair = options.hairColor[a.hairColor];
@@ -57,9 +57,20 @@ export function avatar(a = defaultAvatar) {
   px += r(8,26,8,a.pants===2?2:4,pants)+r(8,28,3,2,a.pants===2?skin:pants)+r(13,28,3,2,a.pants===2?skin:pants);
   px += r(7,30,4,1,a.shoes===0?'#faf2d9':a.shoes===1?'#614541':ink)+r(14,30,3,1,a.shoes===0?'#faf2d9':a.shoes===1?'#614541':ink);
   px += r(6,22,12,4,a.shirt===7?'#f8f5e7':shirt)+r(8,20,8,2,a.shirt===7?'#f8f5e7':shirt)+r(5,25,2,1,skin)+r(17,25,2,1,skin);
-  if (a.shirt>1) px += r(11,21,2,2,'#fff2ce')+r(12,23,1,3,a.shirt===7?shirt:'#302334');
+  if (rear && a.shirt===2) px += r(8,20,8,3,ink)+r(9,20,6,2,shirt);
+  if (!rear && a.shirt>1) px += r(11,21,2,2,'#fff2ce')+r(12,23,1,3,a.shirt===7?shirt:'#302334');
   px += r(8,5,8,1)+r(6,6,12,2)+r(5,8,14,9)+r(7,17,10,3)+r(6,9,12,8,skin)+r(8,7,8,12,skin);
   px += hairline[a.hair].map(part=>r(...part,hair)).join('');
+  if (rear) {
+    if (a.hair!==4) {
+      const nape = a.hair===3?12:a.hair===8?15:17;
+      px += r(6,8,12,nape-8,hair)+r(8,nape,8,1,hair);
+      px += r(7,9,2,5,'#ffffff20');
+    }
+    if (a.prop===3) px += r(5,3,14,2)+r(6,5,12,3)+r(9,7,6,1,'#e9af45');
+    if (a.prop>=4) px += r(17,23,6,5)+r(18,24,4,3,['#eea653','#e7c98b','#8ab6c5','#fcf1d0'][a.prop-4]);
+    return pixelImage(px);
+  }
   px += r(8,16,1,1,'#df866d')+r(15,16,1,1,'#df866d')+r(11,17,2,1,'#a35b52');
   if (a.glasses) {
     const rounded = a.glasses===1;
@@ -84,5 +95,8 @@ export function avatar(a = defaultAvatar) {
   if (a.prop===1 || a.prop===2) px += r(a.prop===1?11:9,20,a.prop===1?2:6,a.prop===1?5:2,'#de685c');
   if (a.prop===3) px += r(5,3,14,2)+r(8,5,8,2)+r(17,5,1,4,'#e9af45');
   if (a.prop>=4) px += r(16,22,7,6)+r(17,23,5,4,['#eea653','#e7c98b','#8ab6c5','#fcf1d0'][a.prop-4])+r(17,26,4,1,'#f9e5b9');
+  return pixelImage(px);
+}
+function pixelImage(px) {
   return 'data:image/svg+xml,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 32" shape-rendering="crispEdges">'+px+'</svg>');
 }
