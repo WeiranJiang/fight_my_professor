@@ -674,114 +674,6 @@ p, .btn, label, input, select, textarea { line-height: 1.5; }
 :is(.daily-home,.arena-preview) .challenge-preview { background: transparent; border: 0; }
 .daily-home .daily-preview[aria-busy="true"]:empty { min-height: 220px; }
 
-/* Navy and whiteboard palettes share the same component roles. */
-:root {
-  color-scheme: dark;
-  --board: #0B1120;
-  --board-raised: #141C2E;
-  --surface-hover: #1C2640;
-  --board-line: #263150;
-  --chalk: #E6E3DA;
-  --chalk-dim: #9AA0AE;
-  --faint: #6B7389;
-  --brand: #7D8FC2;
-  --brand-hover: #5D6E9E;
-  --brand-text: #7D8FC2;
-  --brand-ink: #0B1120;
-  --focus: #A9B6DB;
-  --gold: #D9AE5B;
-  --grade-a: #86B99A;
-  --grade-b: var(--brand);
-  --grade-c: var(--chalk-dim);
-  --grade-f: #CF6F63;
-  --hp-player: var(--brand);
-  --hp-prof: var(--grade-f);
-  --damage-text: var(--grade-f);
-  --scene-floor: var(--board);
-  --pitch: var(--board-line);
-}
-:root[data-theme="whiteboard"] {
-  color-scheme: light;
-  --board: #F5F4EE;
-  --board-raised: #FBFAF6;
-  --surface-hover: #EDEAF2;
-  --board-line: #E2DFD4;
-  --chalk: #141A2A;
-  --chalk-dim: #5C6273;
-  --faint: #6B7389;
-  --brand: #4E5F94;
-  --brand-hover: #3D4D7E;
-  --brand-text: #4E5F94;
-  --brand-ink: #FBFAF6;
-  --focus: #4E5F94;
-  --gold: #9C7424;
-  --grade-a: #3F7A57;
-  --grade-f: #B0483D;
-}
-.brand-period { color: var(--gold); }
-.menu-top { justify-content: space-between; }
-.site-menu {
-  background: var(--board-raised);
-  border-color: var(--board-line);
-}
-.site-menu nav a:hover,.site-menu nav a[aria-current="page"] {
-  background: var(--surface-hover);
-  text-decoration: none;
-}
-.btn:hover,.btn.subtle:hover,.btn.dark:hover { background: var(--surface-hover); }
-.btn.primary:hover,.btn.primary:active { background: var(--brand-hover); }
-.text-link:hover { color: var(--focus); }
-input::placeholder,textarea::placeholder { color: var(--faint); }
-.field :is(input,select,textarea),.filters :is(input,select) {
-  background-color: var(--surface-hover);
-  border-color: var(--board-line);
-}
-.school-mark { background: #FBFAF6; }
-.live-battle {
-  --cabinet: var(--board-raised);
-  --cabinet-inset: var(--board);
-  --cabinet-edge: var(--board-line);
-  --cabinet-text: var(--chalk);
-  --cabinet-accent: var(--brand-text);
-  --cabinet-muted: var(--chalk-dim);
-}
-#app:has(.live-battle,.daily-home,.arena-preview) { background: var(--board); }
-#app:has(.live-battle,.daily-home,.arena-preview)::before {
-  border-color: var(--board-line);
-  background-image:
-    repeating-linear-gradient(0deg,transparent 0 3px,color-mix(in srgb,var(--board-line) 30%,transparent) 3px 4px),
-    repeating-linear-gradient(90deg,var(--board-line) 0 3px,transparent 3px 150px,var(--board-line) 150px 153px),
-    repeating-linear-gradient(0deg,var(--board-line) 0 2px,transparent 2px 83px,var(--board-line) 83px 85px),
-    linear-gradient(110deg,var(--board) 16%,var(--surface-hover) 36%,var(--board-raised) 54%,var(--board) 74%);
-}
-#app:has(.live-battle,.daily-home,.arena-preview)::after { background: var(--board-line); }
-.live-battle .active-stage { --pitch: var(--board-line); }
-.live-battle .fighter-battle :is(strong,small) { text-shadow: 1px 1px var(--board), -1px -1px var(--board); }
-.live-battle .health,.live-battle .round-timer { background: var(--board); }
-.live-battle .health::after {
-  background: repeating-linear-gradient(90deg,transparent 0 calc(10% - 2px),var(--board) calc(10% - 2px) 10%);
-}
-.live-battle .round-cells span { border-color: var(--chalk-dim); }
-.live-battle .round-cells .done { background: var(--grade-a); border-color: var(--grade-a); }
-.live-battle .round-cells .current { background: var(--brand); border-color: var(--brand); }
-.live-battle .answer-bubble { background: var(--board-raised); color: var(--chalk); }
-.live-battle .panel :is(input,.trivia-options label):hover,
-.live-battle .panel input:not([type="radio"]),
-.live-battle .trivia-options label:has(input:checked) {
-  background: var(--surface-hover);
-  border-color: var(--board-line);
-}
-.live-battle input::placeholder { color: var(--faint); }
-.live-battle .round-timer i { background: var(--brand); }
-.live-battle .round-timer.urgent i { background: var(--grade-f); }
-.match-result .result-player { color: var(--gold); }
-.match-result .result-enemy { color: var(--grade-f); }
-[data-grade="A+"],[data-grade="gold"] { color: var(--gold); }
-[data-grade="A"] { color: var(--grade-a); }
-[data-grade="B"] { color: var(--grade-b); }
-[data-grade="C"] { color: var(--grade-c); }
-[data-grade="F"] { color: var(--grade-f); }
-
 /* The font uses a full square per glyph. Keep longer labels and questions spacious. */
 body {
   font-synthesis: none;
@@ -813,3 +705,8 @@ small,.small,.eyebrow,.daily-kicker,.round-track { font-size: 10px; line-height:
   .battle-meta { flex-wrap: wrap; }
   .active-stage .fighter-battle small { font-size: 8px; }
 }
+
+#sound-toggle { margin-top: 12px; }
+#sound-toggle[aria-pressed="false"] { color: var(--chalk-dim); }
+#sound-toggle::after { content: "off"; }
+#sound-toggle[aria-pressed="true"]::after { content: "on"; color: var(--brand-text); }

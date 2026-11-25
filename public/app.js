@@ -89,18 +89,49 @@ const siteMenu=$('#site-menu');
 $('#open-menu').onclick=()=>siteMenu.showModal();
 siteMenu.addEventListener('click',event=>{if(event.target===siteMenu)siteMenu.close();});
 siteMenu.querySelector('form').addEventListener('submit',event=>{event.preventDefault();siteMenu.close();});
-const themeToggle=$('#theme-toggle');
-function setTheme(whiteboard){
-  document.documentElement.dataset.theme=whiteboard?'whiteboard':'navy';
-  themeToggle.setAttribute('aria-pressed',String(whiteboard));
-  $('meta[name="theme-color"]').content=whiteboard?'#F5F4EE':'#0B1120';
-}
-try{setTheme(localStorage.getItem('fmp-palette')==='whiteboard');}catch{setTheme(false);}
-themeToggle.onclick=()=>{
-  const whiteboard=document.documentElement.dataset.theme!=='whiteboard';
-  setTheme(whiteboard);
-  try{localStorage.setItem('fmp-palette',whiteboard?'whiteboard':'navy');}catch{}
+const soundToggle=$('#sound-toggle');
+let soundEnabled=true, audioContext;
+const arcadeSounds={
+  round:[[330,.07],[494,.09],[660,.11]],
+  hit:[[220,.06],[440,.10]],
+  hurt:[[165,.09],[98,.12]],
+  tie:[[294,.07],[294,.08]],
+  warning:[[330,.08]],
+  win:[[392,.08],[494,.08],[587,.09],[784,.18]],
+  loss:[[392,.09],[294,.10],[196,.18]]
 };
+try{soundEnabled=localStorage.getItem('fmp-sound')!=='off';}catch{}
+soundToggle.setAttribute('aria-pressed',String(soundEnabled));
+soundToggle.onclick=()=>{
+  soundEnabled=!soundEnabled;
+  soundToggle.setAttribute('aria-pressed',String(soundEnabled));
+  try{localStorage.setItem('fmp-sound',soundEnabled?'on':'off');}catch{}
+  if(soundEnabled){enableAudio();playSound('round');}
+};
+function enableAudio(){
+  if(!soundEnabled||!window.AudioContext)return;
+  try{
+    audioContext??=new AudioContext();
+    if(audioContext.state==='suspended')audioContext.resume().catch(()=>{});
+  }catch{}
+}
+function playSound(effect){
+  if(!soundEnabled||!audioContext)return;
+  let start=audioContext.currentTime+.015;
+  for(const [pitch,duration] of arcadeSounds[effect]){
+    const tone=audioContext.createOscillator(), volume=audioContext.createGain();
+    tone.type='triangle';
+    tone.frequency.value=pitch;
+    volume.gain.setValueAtTime(.001,start);
+    volume.gain.exponentialRampToValueAtTime(.085,start+.008);
+    volume.gain.exponentialRampToValueAtTime(.001,start+duration);
+    tone.connect(volume).connect(audioContext.destination);
+    tone.start(start);
+    tone.stop(start+duration+.01);
+    tone.onended=()=>{tone.disconnect();volume.disconnect();};
+    start+=duration+.015;
+  }
+}
 function page(content,classes=''){app.innerHTML='<div class="wrap page '+classes+'">'+content+'</div>';}
 const bars=p=>'<div class="bars">'+stats.map((label,i)=>'<div class="bar-row"><span>'+label+'</span><div class="meter" aria-hidden="true"><i style="width:'+p.values[i]+'%"></i></div><strong>'+p.values[i]+'</strong></div>').join('')+'</div>';
 function schoolMark(s){
@@ -389,7 +420,9 @@ async function arena(version){
   }
   page('<div class="battle arena-preview">'+intro+opponent+'<form id="daily-battle" class="panel battle-question stack"><div><h2>'+esc(p.name)+'</h2><p class="small">'+schoolName(p.school)+' · '+esc(p.department)+'</p></div><label class="field question-format">Question format<select name="playlist"><option value="mixed">Mixed trivia</option><option value="estimate">Estimation</option><option value="rare">Rarest answer</option><option value="common">Most common answer</option></select></label>'+err+'<div class="actions"><button class="btn primary raised">'+pencil+(rematch?' Start bonus round':' Start round')+'</button>'+button('View professor',linkProf(p.id),'subtle')+'</div>'+'</form></div>');
   bindForm($('#daily-battle'),async data=>{
+    enableAudio();
     const b=await api('battle/start',{type:match.type,to:rematch,playlist:data.get('playlist')});
+    if(b.status==='question')playSound('round');
     go('battle?id='+qs(b.id));
   });
 }
@@ -435,10 +468,17 @@ function battlePage(b,version,animate=false){
   });
   const next=async(action,answer={})=>{
     const updated=await api('battle',{id:b.id,round:b.round,action,...answer});
+    if(version!==routeCounter)return;
+    if(action==='next')playSound('round');
+    else if(updated.status==='finished')playSound(updated.winner==='player'?'win':updated.winner==='enemy'?'loss':'tie');
+    else {
+      const winner=updated.log.at(-1)?.winner;
+      playSound(winner==='player'?'hit':winner==='enemy'?'hurt':'tie');
+    }
     if(updated.status==='finished'&&updated.reward)refresh().catch(()=>{});
     battlePage(updated,version,action==='guess');
   };
-  if($('#next'))$('#next').onclick=async event=>{event.currentTarget.disabled=true;try{await next('next');}catch(e){showToast(e.message);if($('#next'))$('#next').disabled=false;}};
+  if($('#next'))$('#next').onclick=async event=>{event.currentTarget.disabled=true;enableAudio();try{await next('next');}catch(e){showToast(e.message);if($('#next'))$('#next').disabled=false;}};
   if($('#question-report'))$('#question-report').onclick=()=>report('question',b.id+':'+b.round,'Report this question');
   if($('#share'))$('#share').onclick=async()=>{
     const url=location.href;
@@ -449,7 +489,7 @@ function battlePage(b,version,animate=false){
     const form=$('#guess'), clock=$('#clock'), track=$('#round-timer');
     const warning=$('.time-warning');
     const duration=b.question.time*1000, end=performance.now()+b.remaining;
-    let busy=false;
+    let busy=false, warned=false;
     const tick=async()=>{
       const remaining=Math.max(0,end-performance.now());
       const left=Math.ceil(remaining/1000);
@@ -461,6 +501,7 @@ function battlePage(b,version,animate=false){
       track.style.setProperty('--time-left',String(Math.min(1,remaining/duration)));
       const low=remaining<=duration*.25;
       track.classList.toggle('urgent',low);
+      if(low&&left&&!warned){warned=true;playSound('warning');}
       warning.style.setProperty('--warning-strength',low?String(.65-.45*remaining/(duration*.25)):'0');
       if(left||busy||version!==routeCounter)return;
       busy=true;
@@ -476,6 +517,7 @@ function battlePage(b,version,animate=false){
         if(!/^(?:\d+|\d{1,3}(?:,\d{3})+)(?:\.\d+)?\s*%?$/.test(raw))throw new Error('Enter a positive number or zero.');
         answer={estimate:Number(raw.replace(/[,\s%]/g,''))};
       }
+      enableAudio();
       busy=true;
       try{await next('guess',answer);}finally{busy=false;}
     });
@@ -597,7 +639,7 @@ function contactPage(){
 function styleGuide(){
   const tokens=['board','board-raised','board-line','chalk','chalk-dim','brand','grade-a','grade-b','grade-f','hp-player','hp-prof','gold','redpen'];
   const swatches=tokens.map(token=>'<li><span style="background:var(--'+token+')"></span><code>--'+token+'</code></li>').join('');
-  const icons=['owl','pencil','menu','search','arena','rankings','schools','contact','close'];
+  const icons=['pencil','menu','search','arena','rankings','schools','contact','close'];
   const sprites=icons.map(name=>'<li><code>'+name+'</code><div>'+[1,2,4].map(scale=>'<span style="--pixel-size:'+(scale*16)+'px">'+pixelIcon(name)+'</span>').join('')+'</div></li>').join('');
   page(head('','Style guide')+'<div class="stack guide"><section class="panel stack"><h2>Site palette</h2><ul class="guide-grid">'+swatches+'</ul></section>'+
     '<section class="panel stack"><h2>Type and controls</h2><p>Body text for questions and directions.</p><p class="clock">00:20 · 80 / 100 HP · −18</p><div class="health" aria-label="Example health bar" role="img"><i style="width:80%"></i></div><div class="actions"><button class="btn primary" type="button">Take your seat</button><button class="btn subtle" type="button">View professor</button></div></section>'+

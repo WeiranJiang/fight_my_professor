@@ -12,15 +12,6 @@
     <path fill="#a49ca0" d="M22 10h1v1h-1z M22 11h1v1h-1z M23 9h1v1h-1z M23 10h1v1h-1z M23 11h1v1h-1z M23 12h1v1h-1z M24 10h1v1h-1z M24 11h1v1h-1z"/>
     <path fill="#d78187" d="M24 8h1v1h-1z M24 9h1v1h-1z M25 7h1v1h-1z M25 8h1v1h-1z M25 9h1v1h-1z M25 10h1v1h-1z M26 7h1v1h-1z M26 8h1v1h-1z M26 9h1v1h-1z M27 8h1v1h-1z"/>
   </symbol>
-  <symbol id="owl" viewBox="0 0 16 16">
-    <g fill="#5D6E9E"><rect x="3" y="3" width="10" height="10"/><rect x="2" y="5" width="12" height="6"/><rect x="4" y="13" width="8" height="2"/></g>
-    <g fill="#7D8FC2"><rect x="4" y="4" width="8" height="8"/><rect x="3" y="6" width="10" height="4"/></g>
-    <g fill="#D8D0C0"><rect x="4" y="6" width="3" height="3"/><rect x="9" y="6" width="3" height="3"/><rect x="6" y="10" width="4" height="3"/></g>
-    <g fill="#0B1120"><rect x="3" y="3" width="10" height="2"/><rect x="5" y="2" width="6" height="1"/><rect x="5" y="7" width="1" height="1"/><rect x="10" y="7" width="1" height="1"/></g>
-    <rect x="13" y="4" width="1" height="3" fill="#D9AE5B"/>
-    <rect x="7" y="9" width="2" height="1" fill="#5D6E9E"/>
-    <g fill="#CF6F63"><rect x="1" y="10" width="3" height="3"/><rect x="12" y="10" width="3" height="3"/></g>
-  </symbol>
   <symbol id="menu" viewBox="0 0 16 16"><g fill="currentColor"><rect x="2" y="3" width="12" height="2"/><rect x="2" y="7" width="12" height="2"/><rect x="2" y="11" width="12" height="2"/></g></symbol>
   <symbol id="search" viewBox="0 0 16 16"><g fill="currentColor"><rect x="4" y="2" width="6" height="2"/><rect x="2" y="4" width="2" height="6"/><rect x="10" y="4" width="2" height="6"/><rect x="4" y="10" width="6" height="2"/><rect x="10" y="10" width="3" height="3"/><rect x="12" y="12" width="3" height="3"/></g></symbol>
   <symbol id="arena" viewBox="0 0 16 16"><g fill="currentColor"><rect x="2" y="2" width="3" height="3"/><rect x="5" y="5" width="6" height="6"/><rect x="11" y="11" width="3" height="3"/><rect x="11" y="2" width="3" height="3"/><rect x="2" y="11" width="3" height="3"/></g></symbol>
